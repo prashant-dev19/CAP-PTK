@@ -5,6 +5,7 @@ import Lenis from "lenis";
 import Home from "@/pages/Home";
 import Admin from "@/pages/Admin";
 import SquadsPage from "@/pages/SquadsPage";
+import NoticesPage from "@/pages/NoticesPage";
 
 class ErrorBoundary extends Component {
   constructor(props) {
@@ -74,6 +75,7 @@ function App() {
         <Routes>
           <Route path="/" element={<Home />} />
           <Route path="/squads" element={<SquadsPage />} />
+          <Route path="/notices" element={<NoticesPage />} />
           <Route path="/admin" element={<Admin />} />
           <Route path="*" element={<Home />} />
         </Routes>

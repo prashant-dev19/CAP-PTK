@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { LogOut, Loader2, Lock, ClipboardList, Inbox, Megaphone, Trash2, Pin, Download, Instagram, Plus } from "lucide-react";
 import { WhatsAppIcon } from "@/components/icons";
+import { NoticeModal, padNo } from "@/components/NoticesList";
 import { api, formatApiError } from "@/lib/api";
 import { LogoMark } from "@/components/Logo";
 
@@ -311,6 +312,7 @@ function Dashboard({ user, onLogout }) {
   const [annForm, setAnnForm] = useState({ title: "", body: "" });
   const [annBusy, setAnnBusy] = useState(false);
   const [annError, setAnnError] = useState("");
+  const [selectedAnn, setSelectedAnn] = useState(null);
 
   const load = async () => {
     setError("");
@@ -580,72 +582,69 @@ function Dashboard({ user, onLogout }) {
               </button>
             </form>
 
-            <div className="lg:col-span-7 space-y-4" data-testid="announcements-admin-list">
+            <div className="lg:col-span-7" data-testid="announcements-admin-list">
               {anns.length === 0 ? (
                 <p className="text-ivory/40 text-sm py-16 text-center" data-testid="announcements-empty">
                   No announcements posted yet.
                 </p>
               ) : (
-                anns.map((a) => (
-                  <div
-                    key={a.id}
-                    className="border border-gold/15 bg-pavilion-mid/40 rounded-xl p-6 flex items-start justify-between gap-4"
-                    data-testid={`announcement-item-${a.id}`}
-                  >
-                    <div className="min-w-0">
-                      <p className="text-[0.6rem] tracking-[0.25em] uppercase text-gold/60">{fmtDate(a.created_at)}</p>
-                      <p className="font-display text-xl text-ivory mt-1">{a.title}</p>
-                      <p className="text-sm text-ivory/60 mt-2 whitespace-pre-line">{a.body}</p>
-                      <div className="flex items-center gap-2 mt-4">
-                        <span className="text-[0.55rem] tracking-[0.25em] uppercase text-ivory/40">Share</span>
-                        <a
-                          href={`https://wa.me/?text=${encodeURIComponent(
-                            `${a.title} — Cricket Association Pathankot\n${window.location.origin}/#announcements`
-                          )}`}
-                          target="_blank"
-                          rel="noreferrer noopener"
-                          data-testid={`admin-share-whatsapp-${a.id}`}
-                          aria-label="Share this notice on WhatsApp"
-                          title="Share on WhatsApp"
-                          className="w-7 h-7 rounded-full border border-gold/30 flex items-center justify-center text-gold/80 hover:bg-gold hover:text-pavilion transition-colors"
+                <div className="border border-gold/15 bg-pavilion-mid/40 rounded-xl overflow-hidden">
+                  <div className="hidden sm:grid grid-cols-[60px_1fr_190px] gap-4 px-5 py-4 border-b border-gold/15 text-[0.58rem] tracking-[0.25em] uppercase text-gold/70">
+                    <span>No.</span>
+                    <span>Notice</span>
+                    <span className="text-right">Actions</span>
+                  </div>
+                  {anns.map((a) => (
+                    <div
+                      key={a.id}
+                      data-testid={`announcement-item-${a.id}`}
+                      className="flex flex-col sm:grid sm:grid-cols-[60px_1fr_190px] gap-3 sm:gap-4 px-5 py-4 border-b border-gold/10 last:border-0 items-start sm:items-center hover:bg-gold/5 transition-colors"
+                    >
+                      <span className="font-display text-lg text-gold/80" data-testid={`admin-notice-number-${a.id}`}>
+                        {padNo(a.notice_no)}
+                      </span>
+                      <div className="min-w-0">
+                        <p className="font-display text-lg text-ivory leading-snug flex items-center gap-2 flex-wrap">
+                          {a.title}
+                          {a.pinned && <Pin size={11} className="text-gold shrink-0" />}
+                        </p>
+                        <p className="text-[0.6rem] tracking-[0.2em] uppercase text-ivory/40 mt-1">
+                          {fmtDate(a.created_at)}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-1.5 justify-self-start sm:justify-self-end">
+                        <button
+                          onClick={() => setSelectedAnn(a)}
+                          data-testid={`admin-notice-view-${a.id}`}
+                          aria-label="View notice detail"
+                          title="View detail"
+                          className="inline-flex items-center gap-1.5 text-[0.56rem] tracking-[0.16em] uppercase border border-gold/40 text-gold rounded-full px-3 py-2 hover:bg-gold hover:text-pavilion transition-colors"
                         >
-                          <WhatsAppIcon size={12} />
-                        </a>
-                        <a
-                          href="https://www.instagram.com/cappathankot/"
-                          target="_blank"
-                          rel="noreferrer noopener"
-                          data-testid={`admin-share-instagram-${a.id}`}
-                          aria-label="Share via our Instagram"
-                          title="Open our Instagram to share"
-                          className="w-7 h-7 rounded-full border border-gold/30 flex items-center justify-center text-gold/80 hover:bg-gold hover:text-pavilion transition-colors"
+                          View detail
+                        </button>
+                        <button
+                          onClick={() => togglePin(a.id)}
+                          data-testid={`announcement-pin-${a.id}`}
+                          aria-label={a.pinned ? "Unpin announcement" : "Pin announcement"}
+                          title={a.pinned ? "Unpin — remove from top of the board" : "Pin to top of the board"}
+                          className={`p-2 transition-colors ${a.pinned ? "text-gold" : "text-ivory/40 hover:text-gold"}`}
                         >
-                          <Instagram size={12} />
-                        </a>
+                          <Pin size={15} fill={a.pinned ? "currentColor" : "none"} />
+                        </button>
+                        <button
+                          onClick={() => deleteAnnouncement(a.id)}
+                          data-testid={`announcement-delete-${a.id}`}
+                          aria-label="Delete announcement"
+                          className="text-ivory/40 hover:text-red-300 transition-colors p-2"
+                        >
+                          <Trash2 size={15} />
+                        </button>
                       </div>
                     </div>
-                    <div className="flex items-center gap-1 shrink-0">
-                      <button
-                        onClick={() => togglePin(a.id)}
-                        data-testid={`announcement-pin-${a.id}`}
-                        aria-label={a.pinned ? "Unpin announcement" : "Pin announcement"}
-                        title={a.pinned ? "Unpin — remove from top of the board" : "Pin to top of the board"}
-                        className={`p-1 transition-colors ${a.pinned ? "text-gold" : "text-ivory/40 hover:text-gold"}`}
-                      >
-                        <Pin size={16} fill={a.pinned ? "currentColor" : "none"} />
-                      </button>
-                      <button
-                        onClick={() => deleteAnnouncement(a.id)}
-                        data-testid={`announcement-delete-${a.id}`}
-                        aria-label="Delete announcement"
-                        className="text-ivory/40 hover:text-red-300 transition-colors p-1"
-                      >
-                        <Trash2 size={16} />
-                      </button>
-                    </div>
-                  </div>
-                ))
+                  ))}
+                </div>
               )}
+              <NoticeModal notice={selectedAnn} onClose={() => setSelectedAnn(null)} />
             </div>
           </div>
         ) : msgs.length === 0 ? (

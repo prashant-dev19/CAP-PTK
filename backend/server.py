@@ -168,6 +168,7 @@ class AnnouncementCreate(BaseModel):
     title: str = Field(min_length=3, max_length=160)
     body: str = Field(min_length=3, max_length=4000)
     pinned: bool = False
+    notice_no: int = 0
 
 
 class Announcement(AnnouncementCreate):
@@ -189,7 +190,9 @@ async def list_announcements_admin(admin: dict = Depends(get_current_admin)):
 
 @api_router.post("/admin/announcements", response_model=Announcement, status_code=201)
 async def create_announcement(payload: AnnouncementCreate, admin: dict = Depends(get_current_admin)):
-    ann = Announcement(**payload.model_dump())
+    last = await db.announcements.find_one(sort=[("notice_no", -1)])
+    notice_no = ((last or {}).get("notice_no", 0)) + 1
+    ann = Announcement(**{**payload.model_dump(), "notice_no": notice_no})
     doc = ann.model_dump()
     doc["created_at"] = doc["created_at"].isoformat()
     await db.announcements.insert_one(doc)
@@ -408,6 +411,15 @@ async def startup():
         logger.info(f"Admin password updated from env: {admin_email}")
     await db.users.create_index("email", unique=True)
     await db.login_attempts.create_index("identifier")
+
+    unnumbered = await db.announcements.find({"notice_no": {"$exists": False}}).sort("created_at", 1).to_list(1000)
+    if unnumbered:
+        last = await db.announcements.find_one(sort=[("notice_no", -1)])
+        nxt = ((last or {}).get("notice_no", 0)) + 1
+        for d in unnumbered:
+            await db.announcements.update_one({"id": d["id"]}, {"$set": {"notice_no": nxt}})
+            nxt += 1
+        logger.info(f"Assigned notice numbers to {len(unnumbered)} notices")
 
     squads_count = await db.squads.count_documents({})
     if squads_count and await db.squads.count_documents({"wing": {"$exists": False}}) > 0:
