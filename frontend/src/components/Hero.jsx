@@ -91,7 +91,7 @@ export default function Hero() {
           className="mt-10 flex flex-wrap items-center gap-8"
         >
           <a
-            href="#register"
+            href="/register"
             data-testid="hero-register-cta"
             className="btn-gold bg-gold text-pavilion text-xs tracking-[0.22em] uppercase font-semibold px-9 py-4 rounded-full"
           >

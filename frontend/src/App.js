@@ -6,6 +6,7 @@ import Home from "@/pages/Home";
 import Admin from "@/pages/Admin";
 import SquadsPage from "@/pages/SquadsPage";
 import NoticesPage from "@/pages/NoticesPage";
+import RegisterPage from "@/pages/RegisterPage";
 
 class ErrorBoundary extends Component {
   constructor(props) {
@@ -74,6 +75,7 @@ function App() {
         <SmoothScroll />
         <Routes>
           <Route path="/" element={<Home />} />
+          <Route path="/register" element={<RegisterPage />} />
           <Route path="/squads" element={<SquadsPage />} />
           <Route path="/notices" element={<NoticesPage />} />
           <Route path="/admin" element={<Admin />} />

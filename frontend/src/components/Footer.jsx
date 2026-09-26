@@ -13,7 +13,7 @@ const LINKS = [
   { label: "The Association", href: "/#about" },
   { label: "Squads", href: "/squads" },
   { label: "The Pathway", href: "/#pathway" },
-  { label: "Register", href: "/#register" },
+  { label: "Register", href: "/register" },
   { label: "Contact", href: "/#contact" },
 ];
 

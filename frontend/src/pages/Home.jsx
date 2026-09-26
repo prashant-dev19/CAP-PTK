@@ -7,7 +7,6 @@ import Teams from "@/components/Teams";
 import Process from "@/components/Process";
 import Announcements from "@/components/Announcements";
 import Gallery from "@/components/Gallery";
-import Register from "@/components/Register";
 import Contact from "@/components/Contact";
 import InstagramSection from "@/components/InstagramSection";
 import Footer from "@/components/Footer";
@@ -26,7 +25,6 @@ export default function Home() {
         <Process />
         <Announcements />
         <Gallery />
-        <Register />
         <Contact />
         <InstagramSection />
       </main>

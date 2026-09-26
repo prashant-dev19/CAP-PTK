@@ -67,22 +67,16 @@ export default function Register() {
   };
 
   return (
-    <section id="register" className="py-28 md:py-36 bg-pavilion-deep/40 border-y border-gold/10" data-testid="register-section">
+    <section id="register" className="py-16 md:py-20" data-testid="register-section">
       <div className="max-w-7xl mx-auto px-6 md:px-12 grid md:grid-cols-12 gap-12 md:gap-16">
         <div className="md:col-span-4">
-          <Eyebrow>Player Registration</Eyebrow>
           <Reveal>
-            <h2 className="font-display text-4xl md:text-5xl lg:text-6xl tracking-tight text-ivory mt-6 leading-[1.05]">
-              Take the field for <em className="italic text-gold font-light">Pathankot</em>.
-            </h2>
-          </Reveal>
-          <Reveal delay={0.1}>
-            <p className="mt-8 text-ivory/55 text-sm leading-relaxed max-w-xs">
+            <p className="text-ivory/55 text-sm leading-relaxed max-w-xs">
               Register to be considered for district trials and squad selection. The Association
               will reach out when trials for your age group are announced.
             </p>
           </Reveal>
-          <Reveal delay={0.15}>
+          <Reveal delay={0.1}>
             <ul className="mt-10 space-y-3 text-sm text-ivory/70">
               {["Open to players from District Pathankot", "All age groups — U-14 to Seniors", "Men's & women's wings"].map((x) => (
                 <li key={x} className="flex items-center gap-3">
@@ -90,6 +84,27 @@ export default function Register() {
                 </li>
               ))}
             </ul>
+          </Reveal>
+          <Reveal delay={0.15}>
+            <div className="mt-12 border border-gold/20 rounded-xl p-6 max-w-xs" data-testid="register-help-box">
+              <p className="text-[0.6rem] tracking-[0.28em] uppercase text-gold/80 mb-3">Questions?</p>
+              <p className="text-sm text-ivory/60">
+                <a href="tel:+918968044334" data-testid="register-help-phone" className="hover:text-gold transition-colors">
+                  89680-44334
+                </a>
+                <span className="text-ivory/30 mx-2">·</span>
+                <a
+                  href="mailto:cricketpathankot@gmail.com"
+                  data-testid="register-help-email"
+                  className="hover:text-gold transition-colors break-all"
+                >
+                  cricketpathankot@gmail.com
+                </a>
+              </p>
+              <p className="text-[0.62rem] text-ivory/40 mt-4 leading-relaxed">
+                Carry proof of age and Pathankot district residence when called for trials.
+              </p>
+            </div>
           </Reveal>
         </div>
 

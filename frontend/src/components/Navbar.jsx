@@ -75,7 +75,7 @@ export default function Navbar() {
               </a>
             ))}
             <a
-              href="/#register"
+              href="/register"
               data-testid="nav-register-cta"
               className="btn-gold bg-gold text-pavilion text-[0.68rem] tracking-[0.25em] uppercase font-semibold px-6 py-3 rounded-full"
             >
@@ -108,7 +108,7 @@ export default function Navbar() {
               </a>
             ))}
             <a
-              href="/#register"
+              href="/register"
               onClick={() => setOpen(false)}
               className="font-display text-4xl text-gold italic"
               data-testid="nav-mobile-register"

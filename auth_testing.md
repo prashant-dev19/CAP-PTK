@@ -28,7 +28,7 @@ TOKEN=$(curl -s -X POST "$API_URL/api/auth/login" -H "Content-Type: application/
 Note: login response returns user object only; cookies carry the tokens. Bearer fallback: use access token cookie value.
 
 ## Public endpoints
-- POST /api/registrations (full_name, date_of_birth, gender, age_group, playing_role, batting_style, bowling_style, phone, email, residence, club_or_institute, playing_experience)
+- POST /api/registrations (full_name, date_of_birth, gender, age_group, playing_role, batting_style, bowling_style, phone, email, residence, club_or_institute, playing_experience) — form lives on /register page
 - POST /api/contact (name, email, phone, subject, message)
 
 ## Admin endpoints (require auth)
