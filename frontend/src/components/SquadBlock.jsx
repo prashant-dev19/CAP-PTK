@@ -1,14 +1,13 @@
-import { Link } from "react-router-dom";
-import { ArrowUpRight, Users } from "lucide-react";
+import { Users } from "lucide-react";
 import { Reveal } from "@/components/Reveal";
 
 export default function SquadBlock({ squad, index }) {
-  const sid = squad.age_group.toLowerCase().replace("-", "");
+  const sid = `${(squad.wing || "Men").toLowerCase()}-${squad.age_group.toLowerCase().replace("-", "")}`;
 
   return (
     <section
       id={`squad-${sid}`}
-      className="py-20 md:py-28 border-b border-gold/10"
+      className="py-20 md:py-24 border-b border-gold/10"
       data-testid={`squad-block-${sid}`}
     >
       <div className="max-w-7xl mx-auto px-6 md:px-12">
@@ -28,19 +27,30 @@ export default function SquadBlock({ squad, index }) {
             <Reveal>
               <div className="relative max-w-md">
                 <div className="absolute -inset-0 border border-gold/25 rounded-lg translate-x-4 translate-y-4" />
-                <img
-                  src={squad.group_photo}
-                  alt={`${squad.label} squad group photograph`}
-                  className="relative rounded-lg object-cover w-full aspect-[4/3]"
-                  data-testid={`squad-photo-${sid}`}
-                />
+                {squad.group_photo ? (
+                  <img
+                    src={squad.group_photo}
+                    alt={`${squad.label} squad group photograph`}
+                    className="relative rounded-lg object-cover w-full aspect-[4/3]"
+                    data-testid={`squad-photo-${sid}`}
+                  />
+                ) : (
+                  <div
+                    className="relative rounded-lg w-full aspect-[4/3] border border-dashed border-gold/25 bg-pavilion-mid/30 flex flex-col items-center justify-center text-center px-8"
+                    data-testid={`squad-photo-placeholder-${sid}`}
+                  >
+                    <Users size={22} className="text-gold/50 mb-3" />
+                    <p className="text-xs text-ivory/40 tracking-wide max-w-[230px] leading-relaxed">
+                      Group photograph will be added by the Association after selection.
+                    </p>
+                  </div>
+                )}
               </div>
             </Reveal>
             <Reveal delay={0.1}>
               <p className="mt-8 text-[0.6rem] tracking-[0.22em] uppercase text-ivory/35 flex items-center gap-2">
                 <Users size={12} className="text-gold/60" />
-                {squad.players.length} player{squad.players.length === 1 ? "" : "s"} · group photo updated by the
-                Association
+                {squad.players.length} player{squad.players.length === 1 ? "" : "s"}
               </p>
             </Reveal>
           </div>
@@ -55,17 +65,6 @@ export default function SquadBlock({ squad, index }) {
                   <p className="font-display text-2xl md:text-3xl text-ivory/70">
                     Squad to be formalised after the next selection round.
                   </p>
-                  <p className="text-sm text-ivory/45 mt-4 max-w-md mx-auto leading-relaxed">
-                    Players registered with the Association will be considered for the {squad.label} squad
-                    when trials are announced.
-                  </p>
-                  <Link
-                    to="/#register"
-                    data-testid={`squad-register-${sid}`}
-                    className="mt-8 inline-flex items-center gap-2 btn-gold bg-gold text-pavilion text-[0.65rem] tracking-[0.22em] uppercase font-semibold px-8 py-3.5 rounded-full"
-                  >
-                    Register as a player <ArrowUpRight size={13} />
-                  </Link>
                 </div>
               </Reveal>
             ) : (
@@ -74,7 +73,7 @@ export default function SquadBlock({ squad, index }) {
                   {squad.players.map((p) => (
                     <li
                       key={p.id}
-                      className="flex flex-wrap items-center gap-x-5 gap-y-2 py-5 border-b border-gold/10 group"
+                      className="flex flex-wrap items-center gap-x-5 gap-y-2 py-5 border-b border-gold/10 last:border-0 group"
                       data-testid={`squad-player-${sid}`}
                     >
                       <span className="w-9 h-9 rounded-full border border-gold/40 text-gold font-display text-sm flex items-center justify-center shrink-0">

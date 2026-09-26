@@ -1,11 +1,15 @@
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
 import { Loader2 } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import SquadBlock from "@/components/SquadBlock";
 import { api } from "@/lib/api";
 import Reveal, { Eyebrow } from "@/components/Reveal";
+
+const WINGS = [
+  { wing: "Men", title: "Men's Squads", sub: "U-14 · U-16 · U-19 · U-23 · Seniors" },
+  { wing: "Women", title: "Women's Squads", sub: "U-15 · U-19 · U-23 · Seniors" },
+];
 
 export default function SquadsPage() {
   const [squads, setSquads] = useState(null);
@@ -21,7 +25,7 @@ export default function SquadsPage() {
     <div className="relative min-h-screen bg-pavilion text-ivory font-body" data-testid="squads-page">
       <div aria-hidden="true" className="grain" />
       <Navbar />
-      <main className="pt-32 md:pt-44 pb-4">
+      <main className="pt-32 md:pt-44">
         <header className="max-w-7xl mx-auto px-6 md:px-12">
           <Eyebrow>Squads</Eyebrow>
           <Reveal>
@@ -31,40 +35,37 @@ export default function SquadsPage() {
           </Reveal>
           <Reveal delay={0.1}>
             <p className="mt-6 max-w-xl text-ivory/55 text-sm leading-relaxed">
-              Every official Pathankot squad, age category by age category — group photographs and
-              player details, as formalised after selection.
+              Every official Pathankot squad — men's and women's wings, age category by age
+              category — as formalised by the Association after selection.
             </p>
           </Reveal>
         </header>
 
-        <div className="mt-16 md:mt-24 border-t border-gold/10">
-          {squads === null ? (
-            <div className="flex items-center gap-3 text-ivory/50 text-sm py-24 justify-center">
-              <Loader2 size={18} className="animate-spin text-gold" /> Loading squads…
-            </div>
-          ) : squads.length === 0 ? (
-            <p className="text-ivory/40 text-sm py-24 text-center">Squads will be published here shortly.</p>
-          ) : (
-            squads.map((s, i) => <SquadBlock key={s.id} squad={s} index={i} />)
-          )}
-        </div>
-
-        {squads !== null && squads.length > 0 && (
-          <Reveal>
-            <div className="max-w-7xl mx-auto px-6 md:px-12 py-16 flex flex-col sm:flex-row items-center justify-between gap-6">
-              <p className="text-ivory/50 text-sm max-w-md leading-relaxed">
-                Think you belong in one of these squads? Register with the Association and attend the
-                next trial round.
-              </p>
-              <Link
-                to="/#register"
-                data-testid="squades-cta"
-                className="btn-gold bg-gold text-pavilion text-xs tracking-[0.22em] uppercase font-semibold px-9 py-4 rounded-full"
-              >
-                Register as a Player
-              </Link>
-            </div>
-          </Reveal>
+        {squads === null ? (
+          <div className="flex items-center gap-3 text-ivory/50 text-sm py-24 justify-center">
+            <Loader2 size={18} className="animate-spin text-gold" /> Loading squads…
+          </div>
+        ) : squads.length === 0 ? (
+          <p className="text-ivory/40 text-sm py-24 text-center">Squads will be published here after selection.</p>
+        ) : (
+          WINGS.map(({ wing, title, sub }) => {
+            const list = squads.filter((s) => (s.wing || "Men") === wing);
+            if (!list.length) return null;
+            return (
+              <div key={wing} className="mt-20 md:mt-28" data-testid={`wing-${wing.toLowerCase()}`}>
+                <div className="max-w-7xl mx-auto px-6 md:px-12 flex items-end justify-between gap-6 border-b border-gold/15 pb-6">
+                  <div>
+                    <h2 className="font-display text-3xl md:text-5xl text-ivory tracking-tight">{title}</h2>
+                    <p className="text-[0.6rem] tracking-[0.28em] uppercase text-gold/70 mt-2">{sub}</p>
+                  </div>
+                  <span className="font-display text-2xl text-gold/60 italic">{list.length}</span>
+                </div>
+                {list.map((s, i) => (
+                  <SquadBlock key={s.id} squad={s} index={i} />
+                ))}
+              </div>
+            );
+          })
         )}
       </main>
       <Footer />

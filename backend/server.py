@@ -265,6 +265,7 @@ class SquadOut(BaseModel):
     age_group: str
     label: str
     description: str = ""
+    wing: str = "Men"
     group_photo: str = ""
     players: List[SquadPlayer] = Field(default_factory=list)
     order: int = 0
@@ -408,21 +409,28 @@ async def startup():
     await db.users.create_index("email", unique=True)
     await db.login_attempts.create_index("identifier")
 
-    if await db.squads.count_documents({}) == 0:
-        Q = "?crop=entropy&cs=srgb&fm=jpg&q=85"
-        U = "https://images.unsplash.com"
+    squads_count = await db.squads.count_documents({})
+    if squads_count and await db.squads.count_documents({"wing": {"$exists": False}}) > 0:
+        await db.squads.delete_many({})
+        squads_count = 0
+        logger.info("Legacy squads (no wing) cleared for re-seed")
+    if squads_count == 0:
         squad_seed = [
-            {"order": 1, "age_group": "U-14", "label": "Under-14", "description": "Foundation age-group cricket for the district's youngest talent.", "group_photo": f"{U}/photo-1593766788306-28561086694e{Q}", "players": []},
-            {"order": 2, "age_group": "U-16", "label": "Under-16", "description": "Developing players for state-level age-group competitions.", "group_photo": f"{U}/photo-1595210382051-4d2c31fcc2f4{Q}", "players": []},
-            {"order": 3, "age_group": "U-19", "label": "Under-19", "description": "The pathway squad bridging junior and senior cricket.", "group_photo": f"{U}/photo-1595210382266-2d0077c1f541{Q}", "players": []},
-            {"order": 4, "age_group": "U-23", "label": "Under-23", "description": "Emerging talent on the edge of senior selection.", "group_photo": f"{U}/photo-1729027696167-0f3aa8e92e64{Q}", "players": []},
-            {"order": 5, "age_group": "Seniors", "label": "Senior Men & Women", "description": "The flagship district side in PCA inter-district championships.", "group_photo": f"{U}/photo-1565787154274-c8d076ad34e7{Q}", "players": []},
+            {"order": 1, "wing": "Men", "age_group": "U-14", "label": "Under-14", "description": "Foundation age-group cricket for the district's youngest talent.", "group_photo": "", "players": []},
+            {"order": 2, "wing": "Men", "age_group": "U-16", "label": "Under-16", "description": "Developing players for state-level age-group competitions.", "group_photo": "", "players": []},
+            {"order": 3, "wing": "Men", "age_group": "U-19", "label": "Under-19", "description": "The pathway squad bridging junior and senior cricket.", "group_photo": "", "players": []},
+            {"order": 4, "wing": "Men", "age_group": "U-23", "label": "Under-23", "description": "Emerging talent on the edge of senior selection.", "group_photo": "", "players": []},
+            {"order": 5, "wing": "Men", "age_group": "Seniors", "label": "Senior Men", "description": "The flagship men's district side in PCA inter-district championships.", "group_photo": "", "players": []},
+            {"order": 6, "wing": "Women", "age_group": "U-15", "label": "Under-15 Girls", "description": "The youngest wing of Pathankot women's cricket.", "group_photo": "", "players": []},
+            {"order": 7, "wing": "Women", "age_group": "U-19", "label": "Under-19 Girls", "description": "Developing young women cricketers for state-level competition.", "group_photo": "", "players": []},
+            {"order": 8, "wing": "Women", "age_group": "U-23", "label": "Under-23 Women", "description": "Emerging women's talent on the edge of senior selection.", "group_photo": "", "players": []},
+            {"order": 9, "wing": "Women", "age_group": "Seniors", "label": "Senior Women", "description": "The flagship women's district side in PCA inter-district championships.", "group_photo": "", "players": []},
         ]
         for s in squad_seed:
             s["id"] = str(uuid.uuid4())
             s["created_at"] = datetime.now(timezone.utc).isoformat()
         await db.squads.insert_many(squad_seed)
-        logger.info("Squads seeded (5 age categories)")
+        logger.info("Squads seeded (9 squads: 5 men's, 4 women's)")
 
 
 @app.on_event("shutdown")

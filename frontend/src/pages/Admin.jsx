@@ -503,13 +503,25 @@ function Dashboard({ user, onLogout }) {
                 Keep each squad current: paste the group photograph link, add every selected player
                 with their details, and save. The public squads page updates instantly.
               </p>
-              {squads.map((s) => (
-                <SquadEditor
-                  key={s.id}
-                  squad={s}
-                  onSaved={(u) => setSquads((prev) => prev.map((x) => (x.id === u.id ? u : x)))}
-                />
-              ))}
+              {[
+                { wing: "Men", title: "Men's Wing" },
+                { wing: "Women", title: "Women's Wing" },
+              ].map(({ wing, title }) => {
+                const list = squads.filter((s) => (s.wing || "Men") === wing);
+                if (!list.length) return null;
+                return (
+                  <div key={wing} className="space-y-6">
+                    <p className="font-display text-3xl text-gold italic">{title}</p>
+                    {list.map((s) => (
+                      <SquadEditor
+                        key={s.id}
+                        squad={s}
+                        onSaved={(u) => setSquads((prev) => prev.map((x) => (x.id === u.id ? u : x)))}
+                      />
+                    ))}
+                  </div>
+                );
+              })}
             </div>
           )
         ) : tab === "announcements" ? (
