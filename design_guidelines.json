@@ -1,0 +1,126 @@
+{
+  "project": "Cricket Association Pathankot (CAP)",
+  "theme": {
+    "mode": "dark",
+    "vibe": "Cricket Elegant - Heritage, premium, authoritative, luxurious.",
+    "archetype": "ARCHETYPE 5: LUXURY (Premium, Depth, Mystery) blended with classic sports heritage."
+  },
+  "typography": {
+    "headings": {
+      "family": "Cormorant Garamond",
+      "style": "serif",
+      "weight_usage": "font-medium to font-semibold",
+      "tracking": "tracking-tight",
+      "description": "Used for massive hero text, section headers, and quotes to establish heritage."
+    },
+    "body": {
+      "family": "Manrope",
+      "style": "sans-serif",
+      "weight_usage": "font-light to font-medium",
+      "tracking": "tracking-normal",
+      "description": "Modern, readable geometric sans for forms, dashboard data, and paragraphs."
+    },
+    "font_pairings_instruction": "Use Cormorant Garamond for all Display/Headings, and Manrope for all functional UI and paragraph text."
+  },
+  "colors": {
+    "background": {
+      "primary": "#0A1F16",
+      "secondary": "#112E21",
+      "description": "Deep Pavilion Green - Dark, rich emerald/forest tones."
+    },
+    "text": {
+      "primary": "#F5F2EA",
+      "secondary": "#C3C9C6",
+      "description": "Ivory/Cream for main text to reduce harsh contrast of pure white, soft green-tinted grey for secondary."
+    },
+    "accent": {
+      "primary": "#CFA858",
+      "secondary": "#A8833B",
+      "description": "Trophy Gold - For active states, subtle borders, and key CTA buttons."
+    },
+    "admin": {
+      "sidebar": "#081711",
+      "card": "#112E21",
+      "border": "rgba(207, 168, 88, 0.15)"
+    }
+  },
+  "layouts": {
+    "general": {
+      "spacing": "Generous spacing. Use py-24 or py-32 for sections.",
+      "container": "max-w-7xl mx-auto px-6 md:px-12",
+      "alignment": "Left-aligned content dominance for elegance, except for specific centered hero or quote blocks."
+    },
+    "marketing_pages": {
+      "hero": "100vh full screen, kinetic typography (Cormorant Garamond, text-6xl to text-8xl fluid) line-by-line masked reveal. Background Parallax image with 40% opacity overlay of #0A1F16.",
+      "marquee": "Slow editorial marquee, uppercase Manrope, text-sm, tracking-[0.2em], #CFA858 text.",
+      "about": "Asymmetrical split. 4-col for sticky heading, 8-col for rich text and heritage imagery.",
+      "teams_showcase": "Hover-driven list or floating cards. Clean border-b (1px solid #CFA858/20).",
+      "process": "Vertical timeline for Trials/Selection. Minimalist connecting lines.",
+      "forms": "Large, spacious inputs. border-b-2 only (no full box) for a premium editorial feel, or subtly rounded full inputs.",
+      "footer": "Massive typography (text-[12vw] 'CAP'). Grid for office bearers (President, Secretary, etc.)."
+    },
+    "admin_dashboard": {
+      "layout": "Left sidebar (collapsible on mobile). Top bar for user profile.",
+      "cards": "Flat background, 1px subtle border (#CFA858/20), no heavy shadows.",
+      "tables": "Shadcn UI table, dense padding. Ivory text for data, Gold for status pills (e.g., 'Registered', 'Selected')."
+    }
+  },
+  "motion": {
+    "scroll": "Lenis smooth scrolling is MANDATORY. Provides weight to the site.",
+    "reveal": "Framer Motion. Elements fade in and translate-y-4 on scroll (viewport trigger).",
+    "hero_text": "Masked line reveal with framer-motion.",
+    "hover": "Buttons use Gold background sliding in from left on hover. Links get an underline scale-x-100."
+  },
+  "visual_enhancers": {
+    "textures": "Subtle noise/grain overlay fixed on top of the entire marketing site (pointer-events-none, opacity-5) to kill digital flatness.",
+    "borders": "Use border-white/10 or border-[#CFA858]/20. No thick borders.",
+    "glassmorphism": "Used only for the sticky navigation header: backdrop-blur-xl bg-[#0A1F16]/60 border-b border-[#CFA858]/10."
+  },
+  "components": {
+    "marketing_structure": "Raw HTML + Tailwind (div, section). Do not use Shadcn for standard layout.",
+    "interactive": "Shadcn UI for Dialog, Form, Input, Select, Table (in Admin). Strip Vercel-look, apply gold/green tokens.",
+    "marquee_library": "react-fast-marquee",
+    "component_path_guideline": "Ensure all shadcn files are .js files (not .tsx) as the workspace is configured for .js"
+  },
+  "image_urls": {
+    "hero_background": {
+      "url": "https://images.unsplash.com/photo-1759733845137-5eb942436f49?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NTY2OTF8MHwxfHNlYXJjaHwzfHxjcmlja2V0JTIwc3RhZGl1bSUyMGdyZWVufGVufDB8fHx8MTc5MDQxNjIzMHww&ixlib=rb-4.1.0&q=85",
+      "description": "Cricket stadium, use as dark parallax background",
+      "category": "hero"
+    },
+    "about_section": {
+      "url": "https://images.unsplash.com/photo-1593341646782-e0b495cff86d?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NTYxODl8MHwxfHNlYXJjaHwxfHxjcmlja2V0JTIwYmF0c21hbiUyMGFjdGlvbnxlbnwwfHx8fDE3OTA0MTYyMzB8MA&ixlib=rb-4.1.0&q=85",
+      "description": "Batsman in action, masked/clipped for About section",
+      "category": "about"
+    },
+    "teams_process": {
+      "url": "https://images.unsplash.com/photo-1761255240689-f7864e34628e?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NDk1NzZ8MHwxfHNlYXJjaHwzfHxsZWF0aGVyJTIwY3JpY2tldCUyMGJhbGx8ZW58MHx8fHwxNzkwNDE2MjMwfDA&ixlib=rb-4.1.0&q=85",
+      "description": "Vintage Leather ball, used as a subtle accent image or card background",
+      "category": "teams"
+    }
+  },
+  "instructions_to_main_agent": [
+    "Install `lenis` or `@studio-freight/react-lenis` for smooth scrolling.",
+    "Install `framer-motion` for page transitions and text reveals.",
+    "Install `react-fast-marquee` for the editorial ribbon.",
+    "Install `lucide-react` for icons.",
+    "Install Google Fonts: 'Cormorant Garamond' and 'Manrope' via next/font or standard HTML link.",
+    "Configure tailwind.config.js with colors: primary (#0A1F16), ivory (#F5F2EA), gold (#CFA858).",
+    "Create 2 main layouts: Marketing Layout (with grain texture, lenis, footer) and Admin Layout (sidebar, no grain, structured).",
+    "Add 'data-testid' to all form inputs, submit buttons, and admin table rows."
+  ],
+  "UNIVERSAL_GUIDELINES_FOR_MAIN_AGENT": [
+    "Do not use `transition: all`. Target specific properties.",
+    "Do not center align `.App`.",
+    "Never use emoji characters as icons. Use `lucide-react`.",
+    "Maintain high z-index for glassmorphism headers.",
+    "Add hover states that shift text to gold and slightly lift elements.",
+    "Use 2-3x more spacing (py-24 or py-32) for premium breathing room.",
+    "No generic gradients. Rely on the Deep Green background + Gold text/borders + subtle grain."
+  ],
+  "accessibility": {
+    "contrast": "Ensure Gold text on Deep Green passes WCAG AA. Ivory on Deep Green is excellent.",
+    "reduced_motion": "Wrap framer-motion animations with a prefers-reduced-motion check if possible.",
+    "forms": "Use explicit `<label>` elements for Registration and Contact forms."
+  }
+}
