@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import { Menu, X } from "lucide-react";
+import { Menu, X, Megaphone, ArrowRight } from "lucide-react";
+import { api } from "@/lib/api";
 import Logo from "@/components/Logo";
 
 const LINKS = [
@@ -12,6 +13,14 @@ const LINKS = [
 export default function Navbar() {
   const [open, setOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
+  const [notice, setNotice] = useState(null);
+
+  useEffect(() => {
+    api
+      .get("/announcements")
+      .then(({ data }) => setNotice(data && data.length ? data[0] : null))
+      .catch(() => setNotice(null));
+  }, []);
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 24);
@@ -22,13 +31,34 @@ export default function Navbar() {
 
   return (
     <>
-      <header
-        className={`fixed top-0 inset-x-0 z-50 transition-colors duration-500 ${
-          scrolled || open
-            ? "bg-pavilion/70 backdrop-blur-xl border-b border-gold/10"
-            : "bg-transparent border-b border-transparent"
-        }`}
-      >
+      <header className="fixed top-0 inset-x-0 z-50">
+        <div
+          className={`overflow-hidden transition-all duration-500 ${
+            notice && !scrolled && !open ? "max-h-12" : "max-h-0"
+          }`}
+          data-testid="notice-bar"
+        >
+          <a
+            href="#announcements"
+            data-testid="notice-bar-link"
+            className="flex items-center justify-center gap-3 bg-gold text-pavilion px-6 py-2.5"
+          >
+            <Megaphone size={13} className="shrink-0" />
+            <span className="text-[0.6rem] md:text-[0.65rem] tracking-[0.25em] uppercase font-semibold min-w-0 truncate">
+              <span className="opacity-60">Notice</span> · {notice?.title}
+            </span>
+            <span className="hidden sm:inline-flex items-center gap-1.5 text-[0.6rem] tracking-[0.25em] uppercase shrink-0">
+              View board <ArrowRight size={11} />
+            </span>
+          </a>
+        </div>
+        <div
+          className={`transition-colors duration-500 ${
+            scrolled || open
+              ? "bg-pavilion/70 backdrop-blur-xl border-b border-gold/10"
+              : "bg-transparent border-b border-transparent"
+          }`}
+        >
         <div className="max-w-7xl mx-auto px-6 md:px-12 h-20 flex items-center justify-between">
           <a href="#top" data-testid="nav-logo-link" aria-label="Cricket Association Pathankot — home" onClick={() => setOpen(false)}>
             <Logo />
@@ -60,6 +90,7 @@ export default function Navbar() {
           >
             {open ? <X size={26} /> : <Menu size={26} />}
           </button>
+        </div>
         </div>
       </header>
 

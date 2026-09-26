@@ -32,6 +32,7 @@ User choices (from clarification): main goal = tell about the association + cont
 - CSV export (2026-09-26): GET /api/admin/registrations/export streams all registrations as a CSV download; "Download CSV" button in the admin panel's Registrations tab.
 - Gallery (2026-09-26): 6-photo editorial mosaic of district cricket (representative stock photography until the Association's own album is provided).
 - Instagram section (2026-09-26): elegant one-row section above the footer — follow card (@cappathankot, links to https://www.instagram.com/cappathankot/) + official token-free Instagram profile embed (blockquote + instagram.com/embed.js per playbook). Account verified public.
+- Top notice strip (2026-09-26): gold highlight bar fixed at the very top of every page showing the pinned/latest announcement, linking to the Notice Board section; collapses on scroll.
 - Backend endpoints: POST /api/registrations, POST /api/contact, POST /api/auth/login, POST /api/auth/logout, POST /api/auth/refresh, GET /api/auth/me, GET /api/admin/registrations, GET /api/admin/messages, GET/POST/DELETE announcements (admin-protected writes).
 - Admin dashboard (stats, tabs, dense tables) at /admin; seeded admin in /app/memory/test_credentials.md.
 - Verified: 8/8 curl checks (incl. 401s), form submissions through UI reached admin tables, desktop + mobile screenshots clean, no horizontal overflow.
