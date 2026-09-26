@@ -5,6 +5,8 @@ import TrialsBanner from "@/components/TrialsBanner";
 import About from "@/components/About";
 import Teams from "@/components/Teams";
 import Process from "@/components/Process";
+import Announcements from "@/components/Announcements";
+import Gallery from "@/components/Gallery";
 import Register from "@/components/Register";
 import Contact from "@/components/Contact";
 import Footer from "@/components/Footer";
@@ -21,6 +23,8 @@ export default function Home() {
         <About />
         <Teams />
         <Process />
+        <Announcements />
+        <Gallery />
         <Register />
         <Contact />
       </main>

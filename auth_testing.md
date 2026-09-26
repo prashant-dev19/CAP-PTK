@@ -34,6 +34,11 @@ Note: login response returns user object only; cookies carry the tokens. Bearer 
 ## Admin endpoints (require auth)
 - GET /api/admin/registrations
 - GET /api/admin/messages
+- POST /api/admin/announcements (title, body)
+- DELETE /api/admin/announcements/{id}
+
+## Public announcements
+- GET /api/announcements
 
 ## Brute force
 5 failed logins on the same ip:email -> 429 for 15 minutes.

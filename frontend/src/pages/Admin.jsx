@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { LogOut, Loader2, Lock, ClipboardList, Inbox } from "lucide-react";
+import { LogOut, Loader2, Lock, ClipboardList, Inbox, Megaphone, Trash2 } from "lucide-react";
 import { api, formatApiError } from "@/lib/api";
 import { LogoMark } from "@/components/Logo";
 
@@ -126,14 +126,23 @@ function Dashboard({ user, onLogout }) {
   const [tab, setTab] = useState("registrations");
   const [regs, setRegs] = useState(null);
   const [msgs, setMsgs] = useState(null);
+  const [anns, setAnns] = useState(null);
   const [error, setError] = useState("");
+  const [annForm, setAnnForm] = useState({ title: "", body: "" });
+  const [annBusy, setAnnBusy] = useState(false);
+  const [annError, setAnnError] = useState("");
 
   const load = async () => {
     setError("");
     try {
-      const [r, m] = await Promise.all([api.get("/admin/registrations"), api.get("/admin/messages")]);
+      const [r, m, a] = await Promise.all([
+        api.get("/admin/registrations"),
+        api.get("/admin/messages"),
+        api.get("/admin/announcements").catch(() => []),
+      ]);
       setRegs(r.data);
       setMsgs(m.data);
+      setAnns(Array.isArray(a.data) ? a.data : []);
     } catch (e) {
       if (e?.response?.status === 401) {
         onLogout();
@@ -148,7 +157,37 @@ function Dashboard({ user, onLogout }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const loading = regs === null || msgs === null;
+  const postAnnouncement = async (e) => {
+    e.preventDefault();
+    setAnnBusy(true);
+    setAnnError("");
+    try {
+      await api.post("/admin/announcements", annForm);
+      setAnnForm({ title: "", body: "" });
+      const { data } = await api.get("/admin/announcements");
+      setAnns(data);
+    } catch (err) {
+      if (err?.response?.status === 401) {
+        onLogout();
+        return;
+      }
+      setAnnError(formatApiError(err));
+    } finally {
+      setAnnBusy(false);
+    }
+  };
+
+  const deleteAnnouncement = async (id) => {
+    if (!window.confirm("Delete this announcement?")) return;
+    try {
+      await api.delete(`/admin/announcements/${id}`);
+      setAnns((prev) => prev.filter((a) => a.id !== id));
+    } catch (e) {
+      setError(formatApiError(e));
+    }
+  };
+
+  const loading = regs === null || msgs === null || anns === null;
 
   return (
     <div className="min-h-screen bg-[#081711] text-ivory font-body" data-testid="admin-dashboard">
@@ -174,15 +213,17 @@ function Dashboard({ user, onLogout }) {
       </header>
 
       <main className="max-w-7xl mx-auto px-6 md:px-12 py-10">
-        <div className="grid grid-cols-2 gap-4 mb-10">
+        <div className="grid grid-cols-2 lg:grid-cols-3 gap-4 mb-10">
           <StatCard icon={ClipboardList} label="Player Registrations" value={loading ? "—" : regs.length} testid="stat-registrations" />
           <StatCard icon={Inbox} label="Contact Messages" value={loading ? "—" : msgs.length} testid="stat-messages" />
+          <StatCard icon={Megaphone} label="Announcements" value={loading ? "—" : anns.length} testid="stat-announcements" />
         </div>
 
-        <div className="flex gap-8 border-b border-gold/15 mb-8">
+        <div className="flex gap-8 border-b border-gold/15 mb-8 overflow-x-auto">
           {[
             { id: "registrations", label: "Registrations" },
             { id: "messages", label: "Messages" },
+            { id: "announcements", label: "Announcements" },
           ].map((t) => (
             <button
               key={t.id}
@@ -244,6 +285,92 @@ function Dashboard({ user, onLogout }) {
               </table>
             </div>
           )
+        ) : tab === "announcements" ? (
+          <div className="grid lg:grid-cols-12 gap-8">
+            <form
+              onSubmit={postAnnouncement}
+              data-testid="announcement-form"
+              className="lg:col-span-5 border border-gold/15 bg-pavilion-mid/40 rounded-xl p-8 self-start"
+            >
+              <p className="text-[0.62rem] tracking-[0.25em] uppercase text-gold/80 mb-6">Post a notice</p>
+              <label className="block mb-6">
+                <span className="field-label">Title *</span>
+                <input
+                  className="field"
+                  required
+                  data-testid="announcement-title"
+                  value={annForm.title}
+                  onChange={(e) => setAnnForm({ ...annForm, title: e.target.value })}
+                  placeholder="e.g. District trials — U-16"
+                  maxLength={160}
+                />
+              </label>
+              <label className="block">
+                <span className="field-label">Notice *</span>
+                <textarea
+                  rows={6}
+                  className="field resize-none"
+                  required
+                  data-testid="announcement-body"
+                  value={annForm.body}
+                  onChange={(e) => setAnnForm({ ...annForm, body: e.target.value })}
+                  placeholder="Details players and parents should know"
+                  maxLength={4000}
+                />
+              </label>
+              {annError && (
+                <p className="text-sm text-red-300 mt-4" data-testid="announcement-error">
+                  {annError}
+                </p>
+              )}
+              <button
+                type="submit"
+                disabled={annBusy}
+                data-testid="announcement-submit"
+                className="mt-8 w-full btn-gold bg-gold text-pavilion text-xs tracking-[0.22em] uppercase font-semibold py-4 rounded-full disabled:opacity-60 inline-flex items-center justify-center gap-3"
+              >
+                {annBusy ? (
+                  <>
+                    <Loader2 size={15} className="animate-spin" /> Posting
+                  </>
+                ) : (
+                  <>
+                    <Megaphone size={14} /> Post announcement
+                  </>
+                )}
+              </button>
+            </form>
+
+            <div className="lg:col-span-7 space-y-4" data-testid="announcements-admin-list">
+              {anns.length === 0 ? (
+                <p className="text-ivory/40 text-sm py-16 text-center" data-testid="announcements-empty">
+                  No announcements posted yet.
+                </p>
+              ) : (
+                anns.map((a) => (
+                  <div
+                    key={a.id}
+                    className="border border-gold/15 bg-pavilion-mid/40 rounded-xl p-6 flex items-start justify-between gap-4"
+                    data-testid={`announcement-item-${a.id}`}
+                  >
+                    <div className="min-w-0">
+                      <p className="text-[0.6rem] tracking-[0.25em] uppercase text-gold/60">{fmtDate(a.created_at)}</p>
+                      <p className="font-display text-xl text-ivory mt-1">{a.title}</p>
+                      <p className="text-sm text-ivory/60 mt-2 whitespace-pre-line">{a.body}</p>
+                    </div>
+                    <button
+                      onClick={() => deleteAnnouncement(a.id)}
+                      data-testid={`announcement-delete-${a.id}`}
+                      aria-label="Delete announcement"
+                      className="text-ivory/40 hover:text-red-300 transition-colors shrink-0 p-1"
+                    >
+                      <Trash2 size={16} />
+                    </button>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
         ) : msgs.length === 0 ? (
           <p className="text-ivory/40 text-sm py-16 text-center" data-testid="messages-empty">
             No contact messages yet.

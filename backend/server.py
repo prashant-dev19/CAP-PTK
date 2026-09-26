@@ -160,6 +160,50 @@ async def create_contact(payload: ContactCreate):
     return msg
 
 
+# ---------------- Announcements ----------------
+
+class AnnouncementCreate(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    title: str = Field(min_length=3, max_length=160)
+    body: str = Field(min_length=3, max_length=4000)
+
+
+class Announcement(AnnouncementCreate):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
+@api_router.get("/announcements", response_model=List[Announcement])
+async def list_announcements():
+    docs = await db.announcements.find().sort("created_at", -1).to_list(200)
+    return [Announcement(**d) for d in docs]
+
+
+@api_router.get("/admin/announcements", response_model=List[Announcement])
+async def list_announcements_admin(admin: dict = Depends(get_current_admin)):
+    docs = await db.announcements.find().sort("created_at", -1).to_list(200)
+    return [Announcement(**d) for d in docs]
+
+
+@api_router.post("/admin/announcements", response_model=Announcement, status_code=201)
+async def create_announcement(payload: AnnouncementCreate, admin: dict = Depends(get_current_admin)):
+    ann = Announcement(**payload.model_dump())
+    doc = ann.model_dump()
+    doc["created_at"] = doc["created_at"].isoformat()
+    await db.announcements.insert_one(doc)
+    logger.info(f"New announcement posted: {ann.title}")
+    return ann
+
+
+@api_router.delete("/admin/announcements/{announcement_id}", status_code=204)
+async def delete_announcement(announcement_id: str, admin: dict = Depends(get_current_admin)):
+    result = await db.announcements.delete_one({"id": announcement_id})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Announcement not found")
+    return Response(status_code=204)
+
+
 # ---------------- Auth endpoints ----------------
 
 @api_router.post("/auth/login")
@@ -242,7 +286,7 @@ app.add_middleware(
     CORSMiddleware,
     allow_credentials=True,
     allow_origins=[o.strip() for o in os.environ.get("CORS_ORIGINS", "").split(",") if o.strip()],
-    allow_methods=["GET", "POST", "OPTIONS"],
+    allow_methods=["GET", "POST", "DELETE", "OPTIONS"],
     allow_headers=["*"],
 )
 
