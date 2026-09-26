@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { LogOut, Loader2, Lock, ClipboardList, Inbox, Megaphone, Trash2 } from "lucide-react";
+import { LogOut, Loader2, Lock, ClipboardList, Inbox, Megaphone, Trash2, Pin, Download } from "lucide-react";
 import { api, formatApiError } from "@/lib/api";
 import { LogoMark } from "@/components/Logo";
 
@@ -187,6 +187,19 @@ function Dashboard({ user, onLogout }) {
     }
   };
 
+  const togglePin = async (id) => {
+    try {
+      const { data } = await api.post(`/admin/announcements/${id}/pin`);
+      setAnns((prev) => prev.map((a) => (a.id === id ? data : a)));
+    } catch (e) {
+      if (e?.response?.status === 401) {
+        onLogout();
+        return;
+      }
+      setError(formatApiError(e));
+    }
+  };
+
   const loading = regs === null || msgs === null || anns === null;
 
   return (
@@ -219,23 +232,34 @@ function Dashboard({ user, onLogout }) {
           <StatCard icon={Megaphone} label="Announcements" value={loading ? "—" : anns.length} testid="stat-announcements" />
         </div>
 
-        <div className="flex gap-8 border-b border-gold/15 mb-8 overflow-x-auto">
-          {[
-            { id: "registrations", label: "Registrations" },
-            { id: "messages", label: "Messages" },
-            { id: "announcements", label: "Announcements" },
-          ].map((t) => (
-            <button
-              key={t.id}
-              onClick={() => setTab(t.id)}
-              data-testid={`admin-tab-${t.id}`}
-              className={`pb-3 text-xs tracking-[0.22em] uppercase transition-colors border-b-2 -mb-px ${
-                tab === t.id ? "text-gold border-gold" : "text-ivory/50 border-transparent hover:text-ivory"
-              }`}
+        <div className="flex items-center justify-between gap-6 border-b border-gold/15 mb-8">
+          <div className="flex gap-8 overflow-x-auto">
+            {[
+              { id: "registrations", label: "Registrations" },
+              { id: "messages", label: "Messages" },
+              { id: "announcements", label: "Announcements" },
+            ].map((t) => (
+              <button
+                key={t.id}
+                onClick={() => setTab(t.id)}
+                data-testid={`admin-tab-${t.id}`}
+                className={`pb-3 text-xs tracking-[0.22em] uppercase transition-colors border-b-2 -mb-px whitespace-nowrap ${
+                  tab === t.id ? "text-gold border-gold" : "text-ivory/50 border-transparent hover:text-ivory"
+                }`}
+              >
+                {t.label}
+              </button>
+            ))}
+          </div>
+          {tab === "registrations" && regs !== null && regs.length > 0 && (
+            <a
+              href={`${process.env.REACT_APP_BACKEND_URL}/api/admin/registrations/export`}
+              data-testid="export-csv-button"
+              className="hidden sm:inline-flex items-center gap-2 pb-3 text-xs tracking-[0.22em] uppercase text-ivory/60 hover:text-gold transition-colors whitespace-nowrap"
             >
-              {t.label}
-            </button>
-          ))}
+              <Download size={14} /> Download CSV
+            </a>
+          )}
         </div>
 
         {error && <p className="text-sm text-red-300 mb-6" data-testid="admin-error">{error}</p>}
@@ -358,14 +382,25 @@ function Dashboard({ user, onLogout }) {
                       <p className="font-display text-xl text-ivory mt-1">{a.title}</p>
                       <p className="text-sm text-ivory/60 mt-2 whitespace-pre-line">{a.body}</p>
                     </div>
-                    <button
-                      onClick={() => deleteAnnouncement(a.id)}
-                      data-testid={`announcement-delete-${a.id}`}
-                      aria-label="Delete announcement"
-                      className="text-ivory/40 hover:text-red-300 transition-colors shrink-0 p-1"
-                    >
-                      <Trash2 size={16} />
-                    </button>
+                    <div className="flex items-center gap-1 shrink-0">
+                      <button
+                        onClick={() => togglePin(a.id)}
+                        data-testid={`announcement-pin-${a.id}`}
+                        aria-label={a.pinned ? "Unpin announcement" : "Pin announcement"}
+                        title={a.pinned ? "Unpin — remove from top of the board" : "Pin to top of the board"}
+                        className={`p-1 transition-colors ${a.pinned ? "text-gold" : "text-ivory/40 hover:text-gold"}`}
+                      >
+                        <Pin size={16} fill={a.pinned ? "currentColor" : "none"} />
+                      </button>
+                      <button
+                        onClick={() => deleteAnnouncement(a.id)}
+                        data-testid={`announcement-delete-${a.id}`}
+                        aria-label="Delete announcement"
+                        className="text-ivory/40 hover:text-red-300 transition-colors p-1"
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    </div>
                   </div>
                 ))
               )}

@@ -28,6 +28,8 @@ User choices (from clarification): main goal = tell about the association + cont
 - Trials banner: dates intentionally shown as "To be Announced Soon" per user (update when decided).
 - Real content added per user: office bearers (President Sh. Balbir Manhas, Sr. VP Sh. Satish Mahendru, VP Sh. Varun Thakur, Secretary Sh. Sunny Mahajan, Joint Secretary Sh. Prashant Sharma); office address Jodhamal Colony, Pathankot; phone 89680-44334; email cricketpathankot@gmail.com.
 - Announcements (2026-09-26): officials post notices from the admin panel (POST/DELETE /api/admin/announcements, GET admin + public /api/announcements); notice board section renders on home when notices exist. One live notice posted: "District Trials — All Age Groups".
+- Notice pinning (2026-09-26): POST /api/admin/announcements/{id}/pin toggles pin; pinning is exclusive (one pinned notice max); pinned notice sorts first on public + admin boards and shows a gold "Pinned" badge.
+- CSV export (2026-09-26): GET /api/admin/registrations/export streams all registrations as a CSV download; "Download CSV" button in the admin panel's Registrations tab.
 - Gallery (2026-09-26): 6-photo editorial mosaic of district cricket (representative stock photography until the Association's own album is provided).
 - Backend endpoints: POST /api/registrations, POST /api/contact, POST /api/auth/login, POST /api/auth/logout, POST /api/auth/refresh, GET /api/auth/me, GET /api/admin/registrations, GET /api/admin/messages, GET/POST/DELETE announcements (admin-protected writes).
 - Admin dashboard (stats, tabs, dense tables) at /admin; seeded admin in /app/memory/test_credentials.md.

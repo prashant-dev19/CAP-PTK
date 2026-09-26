@@ -167,6 +167,7 @@ class AnnouncementCreate(BaseModel):
 
     title: str = Field(min_length=3, max_length=160)
     body: str = Field(min_length=3, max_length=4000)
+    pinned: bool = False
 
 
 class Announcement(AnnouncementCreate):
@@ -176,13 +177,13 @@ class Announcement(AnnouncementCreate):
 
 @api_router.get("/announcements", response_model=List[Announcement])
 async def list_announcements():
-    docs = await db.announcements.find().sort("created_at", -1).to_list(200)
+    docs = await db.announcements.find().sort([("pinned", -1), ("created_at", -1)]).to_list(200)
     return [Announcement(**d) for d in docs]
 
 
 @api_router.get("/admin/announcements", response_model=List[Announcement])
 async def list_announcements_admin(admin: dict = Depends(get_current_admin)):
-    docs = await db.announcements.find().sort("created_at", -1).to_list(200)
+    docs = await db.announcements.find().sort([("pinned", -1), ("created_at", -1)]).to_list(200)
     return [Announcement(**d) for d in docs]
 
 
@@ -194,6 +195,47 @@ async def create_announcement(payload: AnnouncementCreate, admin: dict = Depends
     await db.announcements.insert_one(doc)
     logger.info(f"New announcement posted: {ann.title}")
     return ann
+
+
+@api_router.post("/admin/announcements/{announcement_id}/pin", response_model=Announcement)
+async def toggle_pin_announcement(announcement_id: str, admin: dict = Depends(get_current_admin)):
+    doc = await db.announcements.find_one({"id": announcement_id})
+    if not doc:
+        raise HTTPException(status_code=404, detail="Announcement not found")
+    new_pinned = not doc.get("pinned", False)
+    if new_pinned:
+        await db.announcements.update_many({"pinned": True}, {"$set": {"pinned": False}})
+    await db.announcements.update_one({"id": announcement_id}, {"$set": {"pinned": new_pinned}})
+    doc["pinned"] = new_pinned
+    return Announcement(**doc)
+
+
+@api_router.get("/admin/registrations/export")
+async def export_registrations_csv(admin: dict = Depends(get_current_admin)):
+    import csv
+    import io
+
+    docs = await db.registrations.find().sort("created_at", -1).to_list(5000)
+    buffer = io.StringIO()
+    writer = csv.writer(buffer)
+    writer.writerow(
+        ["Full Name", "Date of Birth", "Gender", "Age Group", "Playing Role", "Batting Style",
+         "Bowling Style", "Phone", "Email", "Residence", "Club / Institute", "Experience", "Registered On"]
+    )
+    for d in docs:
+        writer.writerow([
+            d.get("full_name", ""), d.get("date_of_birth", ""), d.get("gender", ""),
+            d.get("age_group", ""), d.get("playing_role", ""), d.get("batting_style", "") or "",
+            d.get("bowling_style", "") or "", d.get("phone", ""), d.get("email", ""),
+            d.get("residence", ""), d.get("club_or_institute", "") or "",
+            d.get("playing_experience", "") or "", d.get("created_at", ""),
+        ])
+    buffer.seek(0)
+    return Response(
+        content=buffer.getvalue(),
+        media_type="text/csv",
+        headers={"Content-Disposition": 'attachment; filename="cap-registrations.csv"'},
+    )
 
 
 @api_router.delete("/admin/announcements/{announcement_id}", status_code=204)

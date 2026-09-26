@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Pin } from "lucide-react";
 import { api } from "@/lib/api";
 import Reveal, { Eyebrow } from "@/components/Reveal";
 
@@ -50,9 +51,19 @@ export default function Announcements() {
           {items.map((a, i) => (
             <Reveal key={a.id} delay={i * 0.06} className="h-full">
               <article
-                className="h-full border border-gold/15 bg-pavilion-mid/40 rounded-xl p-8"
+                className={`h-full border rounded-xl p-8 ${
+                  a.pinned ? "border-gold/50 bg-gold/5" : "border-gold/15 bg-pavilion-mid/40"
+                }`}
                 data-testid={`announcement-card-${a.id}`}
               >
+                {a.pinned && (
+                  <span
+                    className="inline-flex items-center gap-1.5 text-[0.58rem] tracking-[0.25em] uppercase text-gold border border-gold/40 rounded-full px-3 py-1 mb-5"
+                    data-testid="announcement-pinned-badge"
+                  >
+                    <Pin size={10} /> Pinned
+                  </span>
+                )}
                 <p className="text-[0.6rem] tracking-[0.25em] uppercase text-gold/70">{fmtDate(a.created_at)}</p>
                 <h3 className="font-display text-2xl text-ivory mt-3">{a.title}</h3>
                 <p className="text-sm text-ivory/60 leading-relaxed mt-3 whitespace-pre-line">{a.body}</p>

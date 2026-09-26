@@ -33,8 +33,10 @@ Note: login response returns user object only; cookies carry the tokens. Bearer 
 
 ## Admin endpoints (require auth)
 - GET /api/admin/registrations
+- GET /api/admin/registrations/export (CSV download, Content-Disposition attachment)
 - GET /api/admin/messages
-- POST /api/admin/announcements (title, body)
+- POST /api/admin/announcements (title, body, pinned optional)
+- POST /api/admin/announcements/{id}/pin (toggle pin; pinning one unpins others — exclusive)
 - DELETE /api/admin/announcements/{id}
 
 ## Public announcements
