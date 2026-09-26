@@ -10,11 +10,11 @@ const BEARERS = [
 ];
 
 const LINKS = [
-  { label: "The Association", href: "#about" },
-  { label: "Squads", href: "#teams" },
-  { label: "The Pathway", href: "#pathway" },
-  { label: "Register", href: "#register" },
-  { label: "Contact", href: "#contact" },
+  { label: "The Association", href: "/#about" },
+  { label: "Squads", href: "/squads" },
+  { label: "The Pathway", href: "/#pathway" },
+  { label: "Register", href: "/#register" },
+  { label: "Contact", href: "/#contact" },
 ];
 
 export default function Footer() {

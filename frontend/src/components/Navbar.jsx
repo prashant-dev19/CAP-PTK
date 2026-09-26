@@ -4,10 +4,10 @@ import { api } from "@/lib/api";
 import Logo from "@/components/Logo";
 
 const LINKS = [
-  { label: "The Association", href: "#about" },
-  { label: "Squads", href: "#teams" },
-  { label: "The Pathway", href: "#pathway" },
-  { label: "Contact", href: "#contact" },
+  { label: "The Association", href: "/#about" },
+  { label: "Squads", href: "/squads" },
+  { label: "The Pathway", href: "/#pathway" },
+  { label: "Contact", href: "/#contact" },
 ];
 
 export default function Navbar() {
@@ -75,7 +75,7 @@ export default function Navbar() {
               </a>
             ))}
             <a
-              href="#register"
+              href="/#register"
               data-testid="nav-register-cta"
               className="btn-gold bg-gold text-pavilion text-[0.68rem] tracking-[0.25em] uppercase font-semibold px-6 py-3 rounded-full"
             >
@@ -108,7 +108,7 @@ export default function Navbar() {
               </a>
             ))}
             <a
-              href="#register"
+              href="/#register"
               onClick={() => setOpen(false)}
               className="font-display text-4xl text-gold italic"
               data-testid="nav-mobile-register"

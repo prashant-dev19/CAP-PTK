@@ -4,6 +4,7 @@ import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
 import Lenis from "lenis";
 import Home from "@/pages/Home";
 import Admin from "@/pages/Admin";
+import SquadsPage from "@/pages/SquadsPage";
 
 class ErrorBoundary extends Component {
   constructor(props) {
@@ -72,6 +73,7 @@ function App() {
         <SmoothScroll />
         <Routes>
           <Route path="/" element={<Home />} />
+          <Route path="/squads" element={<SquadsPage />} />
           <Route path="/admin" element={<Admin />} />
           <Route path="*" element={<Home />} />
         </Routes>

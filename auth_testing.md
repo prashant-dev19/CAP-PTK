@@ -38,6 +38,7 @@ Note: login response returns user object only; cookies carry the tokens. Bearer 
 - POST /api/admin/announcements (title, body, pinned optional)
 - POST /api/admin/announcements/{id}/pin (toggle pin; pinning one unpins others — exclusive)
 - DELETE /api/admin/announcements/{id}
+- PUT /api/admin/squads/{id} (group_photo, players[])
 
 ## Public announcements
 - GET /api/announcements

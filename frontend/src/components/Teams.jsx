@@ -36,7 +36,7 @@ export default function Teams() {
           {TEAMS.map((t, i) => (
             <Reveal key={t.group} delay={i * 0.05}>
               <a
-                href="#register"
+                href="/squads"
                 data-testid={`team-row-${t.group.toLowerCase().replace("-", "")}`}
                 className="group flex items-center justify-between gap-6 border-t border-gold/15 py-7 md:py-9 px-2 md:px-6 transition-colors duration-300 hover:bg-gold/5"
               >

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { LogOut, Loader2, Lock, ClipboardList, Inbox, Megaphone, Trash2, Pin, Download, Instagram } from "lucide-react";
+import { LogOut, Loader2, Lock, ClipboardList, Inbox, Megaphone, Trash2, Pin, Download, Instagram, Plus } from "lucide-react";
 import { WhatsAppIcon } from "@/components/icons";
 import { api, formatApiError } from "@/lib/api";
 import { LogoMark } from "@/components/Logo";
@@ -123,11 +123,190 @@ function StatCard({ icon: Icon, label, value, testid }) {
   );
 }
 
+function SquadEditor({ squad, onSaved }) {
+  const sid = squad.age_group.toLowerCase().replace("-", "");
+  const [photo, setPhoto] = useState(squad.group_photo || "");
+  const [players, setPlayers] = useState(squad.players || []);
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState("");
+  const [err, setErr] = useState("");
+
+  const setPlayer = (idx, key, value) =>
+    setPlayers((prev) => prev.map((p, i) => (i === idx ? { ...p, [key]: value } : p)));
+
+  const addPlayer = () =>
+    setPlayers((prev) => [
+      ...prev,
+      {
+        id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
+        name: "",
+        role: "",
+        batting_style: "",
+        bowling_style: "",
+        jersey_number: null,
+      },
+    ]);
+
+  const removePlayer = (idx) => setPlayers((prev) => prev.filter((_, i) => i !== idx));
+
+  const save = async () => {
+    setBusy(true);
+    setErr("");
+    setMsg("");
+    try {
+      const clean = players
+        .map((p) => ({ ...p, name: (p.name || "").trim() }))
+        .filter((p) => p.name.length >= 2)
+        .map((p) => ({
+          ...p,
+          jersey_number: p.jersey_number === "" || p.jersey_number == null ? null : Number(p.jersey_number),
+        }));
+      const { data } = await api.put(`/admin/squads/${squad.id}`, { group_photo: photo, players: clean });
+      onSaved(data);
+      setMsg(`Saved — ${clean.length} player${clean.length === 1 ? "" : "s"} in the ${data.age_group} squad.`);
+    } catch (e) {
+      if (e?.response?.status === 401) {
+        setErr("Session expired — please reload the page and sign in again.");
+        return;
+      }
+      setErr(formatApiError(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div
+      className="border border-gold/15 bg-pavilion-mid/40 rounded-xl p-6 md:p-8"
+      data-testid={`squad-editor-${sid}`}
+    >
+      <div className="flex items-center justify-between gap-4 flex-wrap">
+        <p className="font-display text-2xl text-ivory">
+          {squad.age_group} <span className="text-ivory/40 text-base">· {squad.label}</span>
+        </p>
+        <button
+          onClick={save}
+          disabled={busy}
+          data-testid={`squad-save-${sid}`}
+          className="btn-gold bg-gold text-pavilion text-[0.62rem] tracking-[0.2em] uppercase font-semibold px-6 py-2.5 rounded-full inline-flex items-center gap-2 disabled:opacity-60"
+        >
+          {busy ? <Loader2 size={13} className="animate-spin" /> : null} Save squad
+        </button>
+      </div>
+
+      <label className="block mt-6">
+        <span className="field-label">Group photo URL</span>
+        <input
+          className="field"
+          data-testid={`squad-photo-${sid}`}
+          value={photo}
+          onChange={(e) => setPhoto(e.target.value)}
+          placeholder="https:// … link to the squad's group photograph"
+        />
+      </label>
+
+      <div className="mt-8">
+        <div className="flex items-center justify-between mb-4">
+          <p className="text-[0.6rem] tracking-[0.25em] uppercase text-gold/80">Players ({players.length})</p>
+          <button
+            onClick={addPlayer}
+            data-testid={`squad-add-player-${sid}`}
+            className="text-[0.62rem] tracking-[0.2em] uppercase text-gold inline-flex items-center gap-1.5 hover:text-ivory transition-colors"
+          >
+            <Plus size={14} /> Add player
+          </button>
+        </div>
+
+        {players.length === 0 ? (
+          <p className="text-ivory/40 text-sm py-6 text-center border border-dashed border-gold/20 rounded-lg">
+            No players added yet. Click "Add player" to build the squad.
+          </p>
+        ) : (
+          <div className="space-y-4">
+            {players.map((p, idx) => (
+              <div key={p.id} className="flex flex-wrap items-end gap-3" data-testid="squad-player-row">
+                <label className="flex-1 min-w-[160px]">
+                  <span className="field-label">Name</span>
+                  <input
+                    className="field"
+                    value={p.name}
+                    onChange={(e) => setPlayer(idx, "name", e.target.value)}
+                    placeholder="Player name"
+                  />
+                </label>
+                <label className="w-32">
+                  <span className="field-label">Role</span>
+                  <select className="field" value={p.role} onChange={(e) => setPlayer(idx, "role", e.target.value)}>
+                    <option value="">—</option>
+                    <option>Batsman</option>
+                    <option>Bowler</option>
+                    <option>All-Rounder</option>
+                    <option>Wicket-Keeper</option>
+                  </select>
+                </label>
+                <label className="w-36">
+                  <span className="field-label">Batting</span>
+                  <select className="field" value={p.batting_style} onChange={(e) => setPlayer(idx, "batting_style", e.target.value)}>
+                    <option value="">—</option>
+                    <option>Right-hand bat</option>
+                    <option>Left-hand bat</option>
+                  </select>
+                </label>
+                <label className="w-36">
+                  <span className="field-label">Bowling</span>
+                  <select className="field" value={p.bowling_style} onChange={(e) => setPlayer(idx, "bowling_style", e.target.value)}>
+                    <option value="">—</option>
+                    <option>Right-arm fast</option>
+                    <option>Right-arm medium</option>
+                    <option>Left-arm fast</option>
+                    <option>Left-arm medium</option>
+                    <option>Off-spin</option>
+                    <option>Leg-spin</option>
+                  </select>
+                </label>
+                <label className="w-14">
+                  <span className="field-label">No.</span>
+                  <input
+                    type="number"
+                    min="0"
+                    className="field"
+                    value={p.jersey_number ?? ""}
+                    onChange={(e) => setPlayer(idx, "jersey_number", e.target.value)}
+                  />
+                </label>
+                <button
+                  onClick={() => removePlayer(idx)}
+                  aria-label="Remove player"
+                  className="text-ivory/40 hover:text-red-300 transition-colors p-2 pb-3"
+                >
+                  <Trash2 size={15} />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {msg && (
+        <p className="text-xs text-gold mt-5" data-testid="squad-save-msg">
+          {msg}
+        </p>
+      )}
+      {err && (
+        <p className="text-xs text-red-300 mt-2" data-testid="squad-save-error">
+          {err}
+        </p>
+      )}
+    </div>
+  );
+}
+
 function Dashboard({ user, onLogout }) {
   const [tab, setTab] = useState("registrations");
   const [regs, setRegs] = useState(null);
   const [msgs, setMsgs] = useState(null);
   const [anns, setAnns] = useState(null);
+  const [squads, setSquads] = useState(null);
   const [error, setError] = useState("");
   const [annForm, setAnnForm] = useState({ title: "", body: "" });
   const [annBusy, setAnnBusy] = useState(false);
@@ -136,14 +315,16 @@ function Dashboard({ user, onLogout }) {
   const load = async () => {
     setError("");
     try {
-      const [r, m, a] = await Promise.all([
+      const [r, m, a, sq] = await Promise.all([
         api.get("/admin/registrations"),
         api.get("/admin/messages"),
         api.get("/admin/announcements").catch(() => []),
+        api.get("/squads").catch(() => []),
       ]);
       setRegs(r.data);
       setMsgs(m.data);
       setAnns(Array.isArray(a.data) ? a.data : []);
+      setSquads(Array.isArray(sq.data) ? sq.data : []);
     } catch (e) {
       if (e?.response?.status === 401) {
         onLogout();
@@ -239,6 +420,7 @@ function Dashboard({ user, onLogout }) {
               { id: "registrations", label: "Registrations" },
               { id: "messages", label: "Messages" },
               { id: "announcements", label: "Announcements" },
+              { id: "squads", label: "Squads" },
             ].map((t) => (
               <button
                 key={t.id}
@@ -308,6 +490,26 @@ function Dashboard({ user, onLogout }) {
                   ))}
                 </tbody>
               </table>
+            </div>
+          )
+        ) : tab === "squads" ? (
+          squads === null ? (
+            <div className="flex items-center gap-3 text-ivory/50 text-sm py-16 justify-center">
+              <Loader2 size={18} className="animate-spin" /> Loading squads…
+            </div>
+          ) : (
+            <div className="space-y-10" data-testid="squads-admin-list">
+              <p className="text-ivory/50 text-sm max-w-2xl leading-relaxed">
+                Keep each squad current: paste the group photograph link, add every selected player
+                with their details, and save. The public squads page updates instantly.
+              </p>
+              {squads.map((s) => (
+                <SquadEditor
+                  key={s.id}
+                  squad={s}
+                  onSaved={(u) => setSquads((prev) => prev.map((x) => (x.id === u.id ? u : x)))}
+                />
+              ))}
             </div>
           )
         ) : tab === "announcements" ? (

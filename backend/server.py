@@ -238,6 +238,60 @@ async def export_registrations_csv(admin: dict = Depends(get_current_admin)):
     )
 
 
+# ---------------- Squads ----------------
+
+class SquadPlayer(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    name: str = Field(min_length=2, max_length=120)
+    role: Optional[str] = ""
+    batting_style: Optional[str] = ""
+    bowling_style: Optional[str] = ""
+    jersey_number: Optional[int] = None
+
+
+class SquadUpdate(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    group_photo: Optional[str] = None
+    players: List[SquadPlayer] = Field(default_factory=list)
+
+
+class SquadOut(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    id: str
+    age_group: str
+    label: str
+    description: str = ""
+    group_photo: str = ""
+    players: List[SquadPlayer] = Field(default_factory=list)
+    order: int = 0
+
+
+@api_router.get("/squads", response_model=List[SquadOut])
+async def list_squads():
+    docs = await db.squads.find().sort("order", 1).to_list(20)
+    return [SquadOut(**d) for d in docs]
+
+
+@api_router.put("/admin/squads/{squad_id}", response_model=SquadOut)
+async def update_squad(squad_id: str, payload: SquadUpdate, admin: dict = Depends(get_current_admin)):
+    doc = await db.squads.find_one({"id": squad_id})
+    if not doc:
+        raise HTTPException(status_code=404, detail="Squad not found")
+    update_fields = {
+        "players": [p.model_dump() for p in payload.players],
+        "updated_at": datetime.now(timezone.utc).isoformat(),
+    }
+    if payload.group_photo is not None:
+        update_fields["group_photo"] = payload.group_photo
+    await db.squads.update_one({"id": squad_id}, {"$set": update_fields})
+    doc.update(update_fields)
+    return SquadOut(**doc)
+
+
 @api_router.delete("/admin/announcements/{announcement_id}", status_code=204)
 async def delete_announcement(announcement_id: str, admin: dict = Depends(get_current_admin)):
     result = await db.announcements.delete_one({"id": announcement_id})
@@ -353,6 +407,22 @@ async def startup():
         logger.info(f"Admin password updated from env: {admin_email}")
     await db.users.create_index("email", unique=True)
     await db.login_attempts.create_index("identifier")
+
+    if await db.squads.count_documents({}) == 0:
+        Q = "?crop=entropy&cs=srgb&fm=jpg&q=85"
+        U = "https://images.unsplash.com"
+        squad_seed = [
+            {"order": 1, "age_group": "U-14", "label": "Under-14", "description": "Foundation age-group cricket for the district's youngest talent.", "group_photo": f"{U}/photo-1593766788306-28561086694e{Q}", "players": []},
+            {"order": 2, "age_group": "U-16", "label": "Under-16", "description": "Developing players for state-level age-group competitions.", "group_photo": f"{U}/photo-1595210382051-4d2c31fcc2f4{Q}", "players": []},
+            {"order": 3, "age_group": "U-19", "label": "Under-19", "description": "The pathway squad bridging junior and senior cricket.", "group_photo": f"{U}/photo-1595210382266-2d0077c1f541{Q}", "players": []},
+            {"order": 4, "age_group": "U-23", "label": "Under-23", "description": "Emerging talent on the edge of senior selection.", "group_photo": f"{U}/photo-1729027696167-0f3aa8e92e64{Q}", "players": []},
+            {"order": 5, "age_group": "Seniors", "label": "Senior Men & Women", "description": "The flagship district side in PCA inter-district championships.", "group_photo": f"{U}/photo-1565787154274-c8d076ad34e7{Q}", "players": []},
+        ]
+        for s in squad_seed:
+            s["id"] = str(uuid.uuid4())
+            s["created_at"] = datetime.now(timezone.utc).isoformat()
+        await db.squads.insert_many(squad_seed)
+        logger.info("Squads seeded (5 age categories)")
 
 
 @app.on_event("shutdown")
