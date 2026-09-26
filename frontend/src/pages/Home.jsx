@@ -9,6 +9,7 @@ import Announcements from "@/components/Announcements";
 import Gallery from "@/components/Gallery";
 import Register from "@/components/Register";
 import Contact from "@/components/Contact";
+import InstagramSection from "@/components/InstagramSection";
 import Footer from "@/components/Footer";
 
 export default function Home() {
@@ -27,6 +28,7 @@ export default function Home() {
         <Gallery />
         <Register />
         <Contact />
+        <InstagramSection />
       </main>
       <Footer />
     </div>
