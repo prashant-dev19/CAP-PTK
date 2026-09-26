@@ -37,12 +37,12 @@ export default function Hero() {
       </motion.div>
 
       <motion.div
-        className="absolute right-[7%] top-[20%] hidden lg:block text-gold"
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 0.55 }}
+        className="absolute right-[7%] top-[20%] hidden lg:block"
+        initial={{ opacity: 0, y: 14 }}
+        animate={{ opacity: 0.85, y: 0 }}
         transition={{ delay: 1.4, duration: 1.4 }}
       >
-        <LogoMark className="h-40 w-40 animate-spin-slow" />
+        <LogoMark className="h-44 w-44 drop-shadow-[0_10px_30px_rgba(0,0,0,0.5)]" />
       </motion.div>
 
       <div className="relative z-10 max-w-7xl mx-auto px-6 md:px-12 w-full pt-36 md:pt-44 flex-1 flex flex-col justify-center">
