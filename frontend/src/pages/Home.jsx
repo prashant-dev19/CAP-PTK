@@ -1,6 +1,7 @@
 import Navbar from "@/components/Navbar";
 import Hero from "@/components/Hero";
 import Marquee from "@/components/Marquee";
+import TrialsBanner from "@/components/TrialsBanner";
 import About from "@/components/About";
 import Teams from "@/components/Teams";
 import Process from "@/components/Process";
@@ -16,6 +17,7 @@ export default function Home() {
       <main>
         <Hero />
         <Marquee />
+        <TrialsBanner />
         <About />
         <Teams />
         <Process />

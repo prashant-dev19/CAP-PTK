@@ -25,12 +25,13 @@ User choices (from clarification): main goal = tell about the association + cont
 
 ## Implemented (2026-09-26)
 - Full marketing site with kinetic hero (masked line reveal, parallax stadium bg, rotating seam-ball ornament), editorial marquee, squads hover list, pathway timeline, registration & contact forms with success states.
+- Trials banner: dates intentionally shown as "To be Announced Soon" per user (update when decided).
+- Real content added per user: office bearers (President Sh. Balbir Manhas, Sr. VP Sh. Satish Mahendru, VP Sh. Varun Thakur, Secretary Sh. Sunny Mahajan, Joint Secretary Sh. Prashant Sharma); office address Jodhamal Colony, Pathankot; phone 89680-44334; email cricketpathankot@gmail.com.
 - Backend endpoints: POST /api/registrations, POST /api/contact, POST /api/auth/login, POST /api/auth/logout, POST /api/auth/refresh, GET /api/auth/me, GET /api/admin/registrations, GET /api/admin/messages.
 - Admin dashboard (stats, tabs, dense tables) at /admin; seeded admin in /app/memory/test_credentials.md.
 - Verified: 8/8 curl checks (incl. 401s), form submissions through UI reached admin tables, desktop + mobile screenshots clean, no horizontal overflow.
 
 ## Backlog / Prioritized
-- P1: Real content swap — office bearers, office address, phone, email (currently clearly-marked placeholders).
-- P1: Tournament/announcement listings (user deferred).
-- P2: Trials announcement banner + trial dates per age group; admin ability to mark registration status (Registered → Selected); export registrations to CSV.
+- P1: Trials dates — replace "To be Announced Soon" on the banner when the Association decides them.
+- P1 (deferred by user): player portal / expanded backend panel — user wants website focus first.
 - P2: Photo upload for registrations (object storage).

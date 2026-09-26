@@ -2,10 +2,11 @@ import Logo from "@/components/Logo";
 import Reveal from "@/components/Reveal";
 
 const BEARERS = [
-  { role: "President", name: "[Name to be announced]" },
-  { role: "Secretary", name: "[Name to be announced]" },
-  { role: "Joint Secretary", name: "[Name to be announced]" },
-  { role: "Treasurer", name: "[Name to be announced]" },
+  { role: "President", name: "Sh. Balbir Manhas" },
+  { role: "Sr. Vice President", name: "Sh. Satish Mahendru" },
+  { role: "Vice President", name: "Sh. Varun Thakur" },
+  { role: "Secretary", name: "Sh. Sunny Mahajan" },
+  { role: "Joint Secretary", name: "Sh. Prashant Sharma" },
 ];
 
 const LINKS = [
@@ -62,9 +63,21 @@ export default function Footer() {
           <div className="md:col-span-4">
             <p className="text-gold/80 text-[0.6rem] tracking-[0.3em] uppercase mb-5">Reach Us</p>
             <ul className="space-y-3 text-sm text-ivory/60">
-              <li className="italic">[Office address — Pathankot, Punjab]</li>
-              <li className="italic">[+91 — phone to be added]</li>
-              <li className="italic">[Email to be added]</li>
+              <li>Jodhamal Colony, Pathankot</li>
+              <li>
+                <a href="tel:+918968044334" data-testid="footer-phone" className="hover:text-gold transition-colors">
+                  89680-44334
+                </a>
+              </li>
+              <li>
+                <a
+                  href="mailto:cricketpathankot@gmail.com"
+                  data-testid="footer-email"
+                  className="hover:text-gold transition-colors"
+                >
+                  cricketpathankot@gmail.com
+                </a>
+              </li>
             </ul>
           </div>
         </div>

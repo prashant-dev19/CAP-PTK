@@ -1,15 +1,14 @@
 import { useState } from "react";
-import { ChevronDown, Loader2, Check, MapPin, Phone, Mail, Clock } from "lucide-react";
+import { ChevronDown, Loader2, Check, MapPin, Phone, Mail } from "lucide-react";
 import { api, formatApiError } from "@/lib/api";
 import Reveal, { Eyebrow } from "@/components/Reveal";
 
 const SUBJECTS = ["General Enquiry", "Trials & Selection", "Registration Help", "Affiliation & Cricket Matters", "Media"];
 
 const INFO = [
-  { icon: MapPin, label: "Office", value: "[Office address — Pathankot, Punjab]" },
-  { icon: Phone, label: "Phone", value: "[+91 — to be added]" },
-  { icon: Mail, label: "Email", value: "[Email — to be added]" },
-  { icon: Clock, label: "Office hours", value: "[To be added]" },
+  { icon: MapPin, label: "Office", value: "Jodhamal Colony, Pathankot" },
+  { icon: Phone, label: "Phone", value: "89680-44334", href: "tel:+918968044334" },
+  { icon: Mail, label: "Email", value: "cricketpathankot@gmail.com", href: "mailto:cricketpathankot@gmail.com" },
 ];
 
 const EMPTY = { name: "", email: "", phone: "", subject: "", message: "" };
@@ -60,7 +59,17 @@ export default function Contact() {
                   </span>
                   <span>
                     <span className="block text-[0.6rem] tracking-[0.25em] uppercase text-gold/70">{i.label}</span>
-                    <span className="block text-sm text-ivory/70 italic mt-1">{i.value}</span>
+                    {i.href ? (
+                      <a
+                        href={i.href}
+                        data-testid={`contact-info-${i.label.toLowerCase()}`}
+                        className="block text-sm text-ivory/80 hover:text-gold transition-colors mt-1"
+                      >
+                        {i.value}
+                      </a>
+                    ) : (
+                      <span className="block text-sm text-ivory/80 mt-1">{i.value}</span>
+                    )}
                   </span>
                 </li>
               ))}
