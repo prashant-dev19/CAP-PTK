@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import { LogOut, Loader2, Lock, ClipboardList, Inbox, Megaphone, Trash2, Pin, Download } from "lucide-react";
+import { LogOut, Loader2, Lock, ClipboardList, Inbox, Megaphone, Trash2, Pin, Download, Instagram } from "lucide-react";
+import { WhatsAppIcon } from "@/components/icons";
 import { api, formatApiError } from "@/lib/api";
 import { LogoMark } from "@/components/Logo";
 
@@ -381,6 +382,33 @@ function Dashboard({ user, onLogout }) {
                       <p className="text-[0.6rem] tracking-[0.25em] uppercase text-gold/60">{fmtDate(a.created_at)}</p>
                       <p className="font-display text-xl text-ivory mt-1">{a.title}</p>
                       <p className="text-sm text-ivory/60 mt-2 whitespace-pre-line">{a.body}</p>
+                      <div className="flex items-center gap-2 mt-4">
+                        <span className="text-[0.55rem] tracking-[0.25em] uppercase text-ivory/40">Share</span>
+                        <a
+                          href={`https://wa.me/?text=${encodeURIComponent(
+                            `${a.title} — Cricket Association Pathankot\n${window.location.origin}/#announcements`
+                          )}`}
+                          target="_blank"
+                          rel="noreferrer noopener"
+                          data-testid={`admin-share-whatsapp-${a.id}`}
+                          aria-label="Share this notice on WhatsApp"
+                          title="Share on WhatsApp"
+                          className="w-7 h-7 rounded-full border border-gold/30 flex items-center justify-center text-gold/80 hover:bg-gold hover:text-pavilion transition-colors"
+                        >
+                          <WhatsAppIcon size={12} />
+                        </a>
+                        <a
+                          href="https://www.instagram.com/cappathankot/"
+                          target="_blank"
+                          rel="noreferrer noopener"
+                          data-testid={`admin-share-instagram-${a.id}`}
+                          aria-label="Share via our Instagram"
+                          title="Open our Instagram to share"
+                          className="w-7 h-7 rounded-full border border-gold/30 flex items-center justify-center text-gold/80 hover:bg-gold hover:text-pavilion transition-colors"
+                        >
+                          <Instagram size={12} />
+                        </a>
+                      </div>
                     </div>
                     <div className="flex items-center gap-1 shrink-0">
                       <button

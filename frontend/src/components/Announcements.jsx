@@ -1,7 +1,10 @@
 import { useEffect, useState } from "react";
-import { Pin } from "lucide-react";
+import { Pin, Instagram } from "lucide-react";
+import { WhatsAppIcon } from "@/components/icons";
 import { api } from "@/lib/api";
 import Reveal, { Eyebrow } from "@/components/Reveal";
+
+const INSTAGRAM_URL = "https://www.instagram.com/cappathankot/";
 
 const fmtDate = (iso) => {
   try {
@@ -13,6 +16,7 @@ const fmtDate = (iso) => {
 
 export default function Announcements() {
   const [items, setItems] = useState([]);
+  const shareUrl = `${window.location.origin}/#announcements`;
 
   useEffect(() => {
     api
@@ -22,6 +26,9 @@ export default function Announcements() {
   }, []);
 
   if (!items.length) return null;
+
+  const whatsappHref = (a) =>
+    `https://wa.me/?text=${encodeURIComponent(`${a.title} — Cricket Association Pathankot\n${shareUrl}`)}`;
 
   return (
     <section
@@ -42,7 +49,7 @@ export default function Announcements() {
           <Reveal delay={0.1}>
             <p className="max-w-sm text-ivory/55 text-sm leading-relaxed">
               Notices from the Association — trials, selections and district matters, as posted by
-              the officials.
+              the officials. Spread the word on WhatsApp.
             </p>
           </Reveal>
         </div>
@@ -67,6 +74,32 @@ export default function Announcements() {
                 <p className="text-[0.6rem] tracking-[0.25em] uppercase text-gold/70">{fmtDate(a.created_at)}</p>
                 <h3 className="font-display text-2xl text-ivory mt-3">{a.title}</h3>
                 <p className="text-sm text-ivory/60 leading-relaxed mt-3 whitespace-pre-line">{a.body}</p>
+
+                <div className="flex items-center gap-2 mt-6 pt-5 border-t border-gold/10">
+                  <span className="text-[0.58rem] tracking-[0.25em] uppercase text-ivory/40 mr-1">Share</span>
+                  <a
+                    href={whatsappHref(a)}
+                    target="_blank"
+                    rel="noreferrer noopener"
+                    data-testid={`notice-share-whatsapp-${a.id}`}
+                    aria-label="Share this notice on WhatsApp"
+                    title="Share on WhatsApp"
+                    className="w-8 h-8 rounded-full border border-gold/30 flex items-center justify-center text-gold/80 hover:bg-gold hover:text-pavilion transition-colors"
+                  >
+                    <WhatsAppIcon size={13} />
+                  </a>
+                  <a
+                    href={INSTAGRAM_URL}
+                    target="_blank"
+                    rel="noreferrer noopener"
+                    data-testid={`notice-share-instagram-${a.id}`}
+                    aria-label="Share via our Instagram"
+                    title="Open our Instagram to share"
+                    className="w-8 h-8 rounded-full border border-gold/30 flex items-center justify-center text-gold/80 hover:bg-gold hover:text-pavilion transition-colors"
+                  >
+                    <Instagram size={13} />
+                  </a>
+                </div>
               </article>
             </Reveal>
           ))}
