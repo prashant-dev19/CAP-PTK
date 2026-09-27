@@ -124,6 +124,135 @@ function StatCard({ icon: Icon, label, value, testid }) {
   );
 }
 
+function PopupEditor() {
+  const [form, setForm] = useState({ enabled: false, title: "", message: "", image_url: "" });
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState("");
+  const [err, setErr] = useState("");
+
+  useEffect(() => {
+    api
+      .get("/popup")
+      .then(({ data }) =>
+        setForm({
+          enabled: !!data?.enabled,
+          title: data?.title || "",
+          message: data?.message || "",
+          image_url: data?.image_url || "",
+        })
+      )
+      .catch(() => {});
+  }, []);
+
+  const save = async () => {
+    setBusy(true);
+    setErr("");
+    setMsg("");
+    try {
+      const { data } = await api.put("/admin/popup", form);
+      setForm({
+        enabled: !!data.enabled,
+        title: data.title || "",
+        message: data.message || "",
+        image_url: data.image_url || "",
+      });
+      setMsg(
+        data.enabled
+          ? "Pop-up is live on the home page — visitors will see it once per session."
+          : "Pop-up is turned off."
+      );
+    } catch (e) {
+      if (e?.response?.status === 401) {
+        setErr("Session expired — please reload the page and sign in again.");
+        return;
+      }
+      setErr(formatApiError(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="border border-gold/15 bg-pavilion-mid/40 rounded-xl p-6 md:p-8" data-testid="popup-editor">
+      <div className="flex items-center justify-between gap-4 flex-wrap">
+        <div>
+          <p className="font-display text-2xl text-ivory">Home pop-up</p>
+          <p className="text-[0.6rem] tracking-[0.22em] uppercase text-ivory/40 mt-1">
+            Shown once per visitor session · homepage only
+          </p>
+        </div>
+        <label className="flex items-center gap-3 cursor-pointer select-none" data-testid="popup-enable-label">
+          <input
+            type="checkbox"
+            checked={form.enabled}
+            onChange={(e) => setForm({ ...form, enabled: e.target.checked })}
+            data-testid="popup-enable-checkbox"
+            className="w-4 h-4 accent-[#CFA858]"
+          />
+          <span className="text-[0.62rem] tracking-[0.22em] uppercase text-gold font-semibold">Show pop-up</span>
+        </label>
+      </div>
+
+      <div className="mt-8 space-y-6">
+        <label className="block">
+          <span className="field-label">Title</span>
+          <input
+            className="field"
+            data-testid="popup-title"
+            value={form.title}
+            onChange={(e) => setForm({ ...form, title: e.target.value })}
+            placeholder="e.g. District trials — important notice"
+            maxLength={120}
+          />
+        </label>
+        <label className="block">
+          <span className="field-label">Message</span>
+          <textarea
+            rows={4}
+            className="field resize-none"
+            data-testid="popup-message"
+            value={form.message}
+            onChange={(e) => setForm({ ...form, message: e.target.value })}
+            placeholder="The message visitors will see in the pop-up (optional if you use an image)"
+            maxLength={2000}
+          />
+        </label>
+        <label className="block">
+          <span className="field-label">Image URL</span>
+          <input
+            className="field"
+            data-testid="popup-image-url"
+            value={form.image_url}
+            onChange={(e) => setForm({ ...form, image_url: e.target.value })}
+            placeholder="https:// … link to a poster or image (optional)"
+            maxLength={600}
+          />
+        </label>
+      </div>
+
+      {msg && (
+        <p className="text-xs text-gold mt-6" data-testid="popup-save-msg">
+          {msg}
+        </p>
+      )}
+      {err && (
+        <p className="text-xs text-red-300 mt-2" data-testid="popup-save-error">
+          {err}
+        </p>
+      )}
+
+      <button
+        onClick={save}
+        disabled={busy}
+        data-testid="popup-save"
+        className="mt-8 btn-gold bg-gold text-pavilion text-[0.65rem] tracking-[0.22em] uppercase font-semibold px-8 py-3.5 rounded-full inline-flex items-center gap-2 disabled:opacity-60"
+      >
+        {busy ? <Loader2 size={13} className="animate-spin" /> : null} Save pop-up
+      </button>
+    </div>
+  );
+}
+
 function SquadEditor({ squad, onSaved }) {
   const sid = squad.age_group.toLowerCase().replace("-", "");
   const [photo, setPhoto] = useState(squad.group_photo || "");
@@ -423,6 +552,7 @@ function Dashboard({ user, onLogout }) {
               { id: "messages", label: "Messages" },
               { id: "announcements", label: "Announcements" },
               { id: "squads", label: "Squads" },
+              { id: "popup", label: "Pop-up" },
             ].map((t) => (
               <button
                 key={t.id}
@@ -646,6 +776,10 @@ function Dashboard({ user, onLogout }) {
               )}
               <NoticeModal notice={selectedAnn} onClose={() => setSelectedAnn(null)} />
             </div>
+          </div>
+        ) : tab === "popup" ? (
+          <div className="max-w-2xl">
+            <PopupEditor />
           </div>
         ) : msgs.length === 0 ? (
           <p className="text-ivory/40 text-sm py-16 text-center" data-testid="messages-empty">

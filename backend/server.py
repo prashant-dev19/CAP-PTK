@@ -296,6 +296,39 @@ async def update_squad(squad_id: str, payload: SquadUpdate, admin: dict = Depend
     return SquadOut(**doc)
 
 
+# ---------------- Home pop-up ----------------
+
+class PopupUpdate(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    enabled: bool = False
+    title: str = Field(default="", max_length=120)
+    message: str = Field(default="", max_length=2000)
+    image_url: str = Field(default="", max_length=600)
+
+
+@api_router.get("/popup")
+async def get_popup():
+    doc = await db.site_settings.find_one({"slot": "popup"})
+    if not doc:
+        return {"enabled": False, "title": "", "message": "", "image_url": ""}
+    return {k: doc.get(k, "") for k in ("enabled", "title", "message", "image_url")}
+
+
+@api_router.put("/admin/popup")
+async def update_popup(payload: PopupUpdate, admin: dict = Depends(get_current_admin)):
+    doc = {
+        "slot": "popup",
+        "enabled": payload.enabled,
+        "title": payload.title,
+        "message": payload.message,
+        "image_url": payload.image_url,
+        "updated_at": datetime.now(timezone.utc).isoformat(),
+    }
+    await db.site_settings.update_one({"slot": "popup"}, {"$set": doc}, upsert=True)
+    return {k: doc[k] for k in ("enabled", "title", "message", "image_url")}
+
+
 @api_router.delete("/admin/announcements/{announcement_id}", status_code=204)
 async def delete_announcement(announcement_id: str, admin: dict = Depends(get_current_admin)):
     result = await db.announcements.delete_one({"id": announcement_id})

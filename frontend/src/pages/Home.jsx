@@ -9,6 +9,7 @@ import Announcements from "@/components/Announcements";
 import Gallery from "@/components/Gallery";
 import Contact from "@/components/Contact";
 import InstagramSection from "@/components/InstagramSection";
+import HomePopup from "@/components/HomePopup";
 import Footer from "@/components/Footer";
 
 export default function Home() {
@@ -29,6 +30,7 @@ export default function Home() {
         <InstagramSection />
       </main>
       <Footer />
+      <HomePopup />
     </div>
   );
 }
