@@ -5,10 +5,16 @@ load_dotenv()
 import os
 import re
 import uuid
+import asyncio
+import ipaddress
 import logging
 import bcrypt
+import httpx
 import jwt
 import pyotp
+from html import escape
+from html.parser import HTMLParser
+from urllib.parse import urlparse
 from datetime import datetime, timezone, timedelta
 from typing import Optional, List
 
@@ -253,6 +259,197 @@ async def check_form_rate(request: Request, kind: str):
         )
 
 
+# ---------------- Email alerts (Emergent-managed Resend integration) ----------------
+
+EMAIL_BASE_URL = "https://integrations.emergentagent.com"
+EMAIL_KEY = os.environ["EMERGENT_EMAIL_KEY"]
+EMAIL_FROM_NAME = os.environ["EMAIL_FROM_NAME"]
+EMAIL_REPLY_TO = os.environ.get("EMAIL_REPLY_TO")
+ALERT_RECIPIENTS = [e.strip() for e in os.environ.get("ALERT_EMAILS", "").split(",") if e.strip()]
+
+_SHORTENERS = ("bit.ly", "tinyurl.com", "t.co", "is.gd", "cutt.ly", "goo.gl", "rebrand.ly")
+_CRED_ASK = ("reply with your password", "reply with the code", "send your password", "cvv",
+             "send us your password", "enter your password below", "confirm your card number",
+             "your full card number", "seed phrase", "recovery phrase", "verify your card",
+             "social security number", "confirm your bank details")  # G2 ask-back phrasing
+_HOSTISH = re.compile(r"\b(?:https?://)?((?:[a-z0-9-]+\.)+[a-z]{2,})", re.I)   # host-looking text
+
+def _host_ok(host: str) -> bool:
+    """Reject empty, punycode, IP-literal (v4 AND v6), and shortener hosts."""
+    if not host or "xn--" in host:
+        return False
+    try:
+        ipaddress.ip_address(host)
+        return False
+    except ValueError:
+        pass
+    return not any(host == s or host.endswith("." + s) for s in _SHORTENERS)
+
+def _same_site(shown: str, real: str) -> bool:
+    """Share a registrable domain by label-boundary suffix."""
+    return shown == real or real.endswith("." + shown) or shown.endswith("." + real)
+
+class _EmailScan(HTMLParser):
+    """Real parsing, not regex: collects each anchor's decoded visible text."""
+    def __init__(self):
+        super().__init__()
+        self.tags, self.urls, self.anchors = set(), [], []
+        self._href, self._text = None, []
+    def handle_starttag(self, tag, attrs):
+        self.tags.add(tag.lower())
+        self.urls += [v for k, v in attrs if k.lower() in ("href", "src") and v]
+        if tag.lower() == "a":
+            self._href = dict((k.lower(), v) for k, v in attrs).get("href")
+            self._text = []
+    def handle_data(self, data):
+        if self._href is not None:
+            self._text.append(data)
+    def handle_endtag(self, tag):
+        if tag.lower() == "a" and self._href is not None:
+            self.anchors.append((self._href, "".join(self._text)))
+            self._href, self._text = None, []
+
+def _assert_safe_email(subject: str, html: str) -> None:
+    """Best-effort structural check for G2 + G3 (defense in depth, NOT G1)."""
+    scan = _EmailScan(); scan.feed(html)
+    if scan.tags & {"form", "input", "textarea", "select"}:
+        raise ValueError("No forms or input fields in email (G2)")
+    body = f"{subject}\n{html}".lower()
+    for p in _CRED_ASK:
+        if p in body:
+            raise ValueError(f"Email asks the recipient for credentials: {p!r} (G2)")
+    for url in scan.urls:
+        low = url.strip().lower()
+        if low.startswith(("mailto:", "tel:", "cid:", "#")):
+            continue
+        if not low.startswith("https://"):
+            raise ValueError(f"Email links/assets must be absolute https: {url!r} (G3)")
+        host = urlparse(low).hostname or ""
+        if not _host_ok(host) or urlparse(low).username is not None:
+            raise ValueError(f"Shortened, numeric-host or credential-bearing URL: {url!r} (G3)")
+    for href, text in scan.anchors:
+        real = urlparse(href.strip().lower()).hostname or ""
+        if not real:
+            continue
+        for m in _HOSTISH.finditer(text):
+            if not _same_site(m.group(1).lower(), real):
+                raise ValueError(f"Anchor text {m.group(1)!r} != real link host {real!r} (G3)")
+
+
+async def send_email(*, to, subject, html, reply_to=None):
+    _assert_safe_email(subject, html)          # G2-G3 gate — never skip
+    payload = {
+        "to": to if isinstance(to, list) else [to],
+        "subject": subject,
+        "html": html,
+        "from_name": EMAIL_FROM_NAME,
+    }
+    if reply_to or EMAIL_REPLY_TO:
+        payload["contact_email"] = reply_to or EMAIL_REPLY_TO
+    try:
+        async with httpx.AsyncClient(timeout=30) as client:
+            resp = await client.post(
+                f"{EMAIL_BASE_URL}/api/v1/email/send",
+                headers={"X-Email-Key": EMAIL_KEY},
+                json=payload,
+            )
+        resp.raise_for_status()
+        email_id = resp.json().get("id")
+        logger.info(f"Email alert sent to {len(payload['to'])} recipient(s): {subject[:60]} (id={email_id})")
+        return email_id
+    except httpx.HTTPStatusError as e:
+        logger.error(f"Email send failed: {e.response.status_code} {e.response.text}")
+        raise HTTPException(status_code=502, detail="Failed to send email")
+    except Exception as e:
+        logger.error(f"Email send error: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to send email")
+
+
+def _email_row(label: str, value) -> str:
+    shown = escape(str(value).strip()) if value and str(value).strip() else "—"
+    return (
+        f'<tr>'
+        f'<td style="padding:7px 18px 7px 0;font-size:13px;color:#6b6b60;white-space:nowrap;vertical-align:top">{escape(label)}</td>'
+        f'<td style="padding:7px 0;font-size:13px;color:#1c2419;font-weight:600;word-break:break-word">{shown}</td>'
+        f'</tr>'
+    )
+
+
+def _email_shell(title: str, rows_html: str, note: str) -> str:
+    return (
+        '<table role="presentation" width="100%" style="background:#f2efe6;padding:28px 12px" bgcolor="#f2efe6">'
+        '<tr><td align="center">'
+        '<table role="presentation" width="100%" style="max-width:560px;background:#ffffff;border-radius:12px;overflow:hidden">'
+        f'<tr><td style="background:#0A1F16;padding:20px 26px" bgcolor="#0A1F16">'
+        f'<p style="margin:0;color:#CFA858;font-size:11px;letter-spacing:2px;text-transform:uppercase">{escape(EMAIL_FROM_NAME)}</p>'
+        f'<p style="margin:7px 0 0;color:#F5F2EA;font-size:19px;font-weight:bold">{escape(title)}</p>'
+        '</td></tr>'
+        f'<tr><td style="padding:22px 26px"><table role="presentation" width="100%">{rows_html}</table>'
+        f'<p style="margin:16px 0 0;font-size:12px;color:#8a8a80">{escape(note)}</p></td></tr>'
+        '<tr><td style="padding:14px 26px;background:#f8f6ef" bgcolor="#f8f6ef">'
+        f'<p style="margin:0;font-size:11px;color:#9a9a90">Sent automatically by the {escape(EMAIL_FROM_NAME)} website when a form is submitted.</p>'
+        '</td></tr>'
+        '</table></td></tr></table>'
+    )
+
+
+async def send_registration_alert(reg: dict):
+    if not ALERT_RECIPIENTS:
+        return
+    rows = "".join([
+        _email_row("Full name", reg.get("full_name")),
+        _email_row("Date of birth", reg.get("date_of_birth")),
+        _email_row("Gender", reg.get("gender")),
+        _email_row("Age group", reg.get("age_group")),
+        _email_row("Playing role", reg.get("playing_role")),
+        _email_row("Batting style", reg.get("batting_style")),
+        _email_row("Bowling style", reg.get("bowling_style")),
+        _email_row("Phone", reg.get("phone")),
+        _email_row("Email", reg.get("email")),
+        _email_row("Residence", reg.get("residence")),
+        _email_row("Club / institute", reg.get("club_or_institute")),
+        _email_row("Experience", reg.get("playing_experience")),
+    ])
+    html = _email_shell("New player registration", rows, "Open the admin panel to view and manage registrations.")
+    await send_email(
+        to=ALERT_RECIPIENTS,
+        subject=f"New player registration — {reg.get('full_name', '')} ({reg.get('age_group', '')})",
+        html=html,
+        reply_to=EMAIL_REPLY_TO,
+    )
+
+
+async def send_contact_alert(msg: dict):
+    if not ALERT_RECIPIENTS:
+        return
+    rows = "".join([
+        _email_row("Name", msg.get("name")),
+        _email_row("Email", msg.get("email")),
+        _email_row("Phone", msg.get("phone")),
+        _email_row("Subject", msg.get("subject")),
+        _email_row("Message", msg.get("message")),
+    ])
+    html = _email_shell("New contact message", rows, "Open the admin panel to view and reply from the Messages tab.")
+    await send_email(
+        to=ALERT_RECIPIENTS,
+        subject=f"New contact message — {msg.get('name', '')}",
+        html=html,
+        reply_to=EMAIL_REPLY_TO,
+    )
+
+
+def queue_email_alert(alert_coro):
+    """Fire-and-forget: a mail outage must never break or delay a form submission."""
+
+    async def _run():
+        try:
+            await alert_coro
+        except Exception as e:
+            logger.error(f"Email alert failed: {e}")
+
+    asyncio.create_task(_run())
+
+
 # ---------------- Public endpoints ----------------
 
 @api_router.get("/")
@@ -273,6 +470,7 @@ async def create_registration(payload: RegistrationCreate, request: Request):
     doc["created_at"] = doc["created_at"].isoformat()
     await db.registrations.insert_one(doc)
     logger.info(f"New player registration: {reg.full_name} ({reg.age_group})")
+    queue_email_alert(send_registration_alert(doc))
     return reg
 
 
@@ -289,6 +487,7 @@ async def create_contact(payload: ContactCreate, request: Request):
     doc["created_at"] = doc["created_at"].isoformat()
     await db.contact_messages.insert_one(doc)
     logger.info(f"New contact message from: {msg.name}")
+    queue_email_alert(send_contact_alert(doc))
     return msg
 
 
