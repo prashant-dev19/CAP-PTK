@@ -1,13 +1,6 @@
 import Logo from "@/components/Logo";
 import Reveal from "@/components/Reveal";
-
-const BEARERS = [
-  { role: "President", name: "Sh. Balbir Manhas" },
-  { role: "Sr. Vice President", name: "Sh. Satish Mahendru" },
-  { role: "Vice President", name: "Sh. Varun Thakur" },
-  { role: "Secretary", name: "Sh. Sunny Mahajan" },
-  { role: "Joint Secretary", name: "Sh. Prashant Sharma" },
-];
+import { useSiteContent } from "@/context/SiteContent";
 
 const LINKS = [
   { label: "The Association", href: "/#about" },
@@ -18,29 +11,32 @@ const LINKS = [
 ];
 
 export default function Footer() {
+  const c = useSiteContent();
+  const bearers = (c.bearers || []).filter((b) => b.role || b.name);
+  const tel = `tel:${c.contact_phone.replace(/[^+\d]/g, "")}`;
+
   return (
     <footer className="bg-pavilion-deep border-t border-gold/15 pt-20 md:pt-28 overflow-hidden" data-testid="footer">
       <div className="max-w-7xl mx-auto px-6 md:px-12">
         <div className="grid md:grid-cols-12 gap-12">
           <div className="md:col-span-5">
             <Logo />
-            <p className="mt-6 text-sm text-ivory/50 leading-relaxed max-w-xs font-light">
-              The official cricketing body of District Pathankot, affiliated to the Punjab Cricket
-              Association, Mohali.
-            </p>
-            <div className="mt-8 max-w-xs">
-              <p className="text-gold/80 text-[0.6rem] tracking-[0.3em] uppercase mb-4">Office Bearers</p>
-              {BEARERS.map((b) => (
-                <p
-                  key={b.role}
-                  className="flex justify-between border-b border-ivory/5 pb-2 mb-2 text-sm"
-                  data-testid="footer-bearer"
-                >
-                  <span className="text-ivory/40">{b.role}</span>
-                  <span className="italic text-ivory/60">{b.name}</span>
-                </p>
-              ))}
-            </div>
+            <p className="mt-6 text-sm text-ivory/50 leading-relaxed max-w-xs font-light">{c.footer_tagline}</p>
+            {bearers.length > 0 && (
+              <div className="mt-8 max-w-xs">
+                <p className="text-gold/80 text-[0.6rem] tracking-[0.3em] uppercase mb-4">Office Bearers</p>
+                {bearers.map((b) => (
+                  <p
+                    key={b.role}
+                    className="flex justify-between border-b border-ivory/5 pb-2 mb-2 text-sm"
+                    data-testid="footer-bearer"
+                  >
+                    <span className="text-ivory/40">{b.role}</span>
+                    <span className="italic text-ivory/60">{b.name}</span>
+                  </p>
+                ))}
+              </div>
+            )}
           </div>
 
           <div className="md:col-span-3">
@@ -50,7 +46,7 @@ export default function Footer() {
                 <li key={l.href}>
                   <a
                     href={l.href}
-                    data-testid={`footer-link-${l.href.slice(1)}`}
+                    data-testid={`footer-link-${l.href.replace("/", "").replace("#", "") || "home"}`}
                     className="text-sm text-ivory/60 hover:text-gold transition-colors"
                   >
                     {l.label}
@@ -63,19 +59,19 @@ export default function Footer() {
           <div className="md:col-span-4">
             <p className="text-gold/80 text-[0.6rem] tracking-[0.3em] uppercase mb-5">Reach Us</p>
             <ul className="space-y-3 text-sm text-ivory/60">
-              <li>Jodhamal Colony, Pathankot</li>
+              <li>{c.contact_address}</li>
               <li>
-                <a href="tel:+918968044334" data-testid="footer-phone" className="hover:text-gold transition-colors">
-                  89680-44334
+                <a href={tel} data-testid="footer-phone" className="hover:text-gold transition-colors">
+                  {c.contact_phone}
                 </a>
               </li>
               <li>
                 <a
-                  href="mailto:cricketpathankot@gmail.com"
+                  href={`mailto:${c.contact_email}`}
                   data-testid="footer-email"
                   className="hover:text-gold transition-colors"
                 >
-                  cricketpathankot@gmail.com
+                  {c.contact_email}
                 </a>
               </li>
             </ul>

@@ -329,6 +329,127 @@ async def update_popup(payload: PopupUpdate, admin: dict = Depends(get_current_a
     return {k: doc[k] for k in ("enabled", "title", "message", "image_url")}
 
 
+# ---------------- Homepage content (CMS) ----------------
+
+HERO_URL = "https://images.unsplash.com/photo-1759733845137-5eb942436f49?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NTY2OTF8MHwxfHNlYXJjaHwzfHxjcmlja2V0JTIwc3RhZGl1bSUyMGdyZWVufGVufDB8fHx8MTc5MDQxNjIzMHww&ixlib=rb-4.1.0&q=85"
+ABOUT_URL = "https://images.unsplash.com/photo-1593341646782-e0b495cff86d?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NTYxODl8MHwxfHNlYXJjaHwxfHxjcmlja2V0JTIwYmF0c21hbiUyMGFjdGlvbnxlbnwwfHx8fDE3OTA0MTYyMzB8MA&ixlib=rb-4.1.0&q=85"
+G = "?crop=entropy&cs=srgb&fm=jpg&q=85"
+U = "https://images.unsplash.com"
+
+DEFAULT_CONTENT = {
+    "hero_line1": "The Home of",
+    "hero_line2_gold": "Pathankot",
+    "hero_line2_rest": "Cricket",
+    "hero_subline": "The official cricketing body of District Pathankot, affiliated to the Punjab Cricket Association, Mohali — conducting trials, selecting players and fielding squads from U-14 to Seniors, for men and women, into inter-district competition.",
+    "hero_image": HERO_URL,
+    "about_heading": "One body for the game in Pathankot.",
+    "about_p1": "The Cricket Association Pathankot (CAP) is the official cricketing body for District Pathankot, affiliated to the Punjab Cricket Association (PCA), Mohali.",
+    "about_p2": "From identifying talent at open trials to formalising squads after selection, the Association administers every stage of the district game — conducting selections, making teams, and sending Pathankot's sides to inter-district competition.",
+    "about_image": ABOUT_URL,
+    "about_points": [
+        "Official body for District Pathankot",
+        "Affiliated to PCA, Mohali",
+        "Trials & merit-based selections",
+        "Squads from U-14 to Seniors — Men & Women",
+    ],
+    "trials_label": "District Trials · All Age Groups",
+    "trials_heading": "Open trials for U-14 to Seniors — men & women.",
+    "trials_dates": "To be Announced Soon",
+    "teams_heading": "Nine squads. Two wings.",
+    "teams_accent": "One district.",
+    "teams_sub": "Selections are held for every category, for men and women alike. Registered players are called to trials as squads are formalised.",
+    "process_heading": "From trials to the district cap.",
+    "process_steps": [
+        {"title": "Open Trials", "desc": "Trials for each age group are announced by the Association, open to eligible players from across District Pathankot."},
+        {"title": "Merit Selection", "desc": "Selectors assess skill, form and match temperament. Selections are made on merit — for both men's and women's wings."},
+        {"title": "Squad Formation", "desc": "Selected players are formalised into official district squads — the Pathankot teams for the season."},
+        {"title": "Inter-District", "desc": "Squads carry the district colours into inter-district matches under the Punjab Cricket Association."},
+    ],
+    "gallery_heading": "District cricket, in pictures.",
+    "gallery_urls": [
+        f"{U}/photo-1565787154274-c8d076ad34e7{G}",
+        f"{U}/photo-1593766827228-8737b4534aa6{G}",
+        f"{U}/photo-1595210382051-4d2c31fcc2f4{G}",
+        f"{U}/photo-1624193757636-b829dfa06a1b{G}",
+        f"{U}/photo-1729027696167-0f3aa8e92e64{G}",
+        f"{U}/photo-1595210382266-2d0077c1f541{G}",
+    ],
+    "contact_address": "Jodhamal Colony, Pathankot",
+    "contact_phone": "89680-44334",
+    "contact_email": "cricketpathankot@gmail.com",
+    "footer_tagline": "The official cricketing body of District Pathankot, affiliated to the Punjab Cricket Association, Mohali.",
+    "bearers": [
+        {"role": "President", "name": "Sh. Balbir Manhas"},
+        {"role": "Sr. Vice President", "name": "Sh. Satish Mahendru"},
+        {"role": "Vice President", "name": "Sh. Varun Thakur"},
+        {"role": "Secretary", "name": "Sh. Sunny Mahajan"},
+        {"role": "Joint Secretary", "name": "Sh. Prashant Sharma"},
+    ],
+}
+
+
+class ProcessStep(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    title: str = ""
+    desc: str = ""
+
+
+class Bearer(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    role: str = ""
+    name: str = ""
+
+
+class SiteContentUpdate(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    hero_line1: str = DEFAULT_CONTENT["hero_line1"]
+    hero_line2_gold: str = DEFAULT_CONTENT["hero_line2_gold"]
+    hero_line2_rest: str = DEFAULT_CONTENT["hero_line2_rest"]
+    hero_subline: str = DEFAULT_CONTENT["hero_subline"]
+    hero_image: str = DEFAULT_CONTENT["hero_image"]
+    about_heading: str = DEFAULT_CONTENT["about_heading"]
+    about_p1: str = DEFAULT_CONTENT["about_p1"]
+    about_p2: str = DEFAULT_CONTENT["about_p2"]
+    about_image: str = DEFAULT_CONTENT["about_image"]
+    about_points: List[str] = Field(default_factory=lambda: list(DEFAULT_CONTENT["about_points"]))
+    trials_label: str = DEFAULT_CONTENT["trials_label"]
+    trials_heading: str = DEFAULT_CONTENT["trials_heading"]
+    trials_dates: str = DEFAULT_CONTENT["trials_dates"]
+    teams_heading: str = DEFAULT_CONTENT["teams_heading"]
+    teams_accent: str = DEFAULT_CONTENT["teams_accent"]
+    teams_sub: str = DEFAULT_CONTENT["teams_sub"]
+    process_heading: str = DEFAULT_CONTENT["process_heading"]
+    process_steps: List[ProcessStep] = Field(default_factory=lambda: [ProcessStep(**s) for s in DEFAULT_CONTENT["process_steps"]])
+    gallery_heading: str = DEFAULT_CONTENT["gallery_heading"]
+    gallery_urls: List[str] = Field(default_factory=lambda: list(DEFAULT_CONTENT["gallery_urls"]))
+    contact_address: str = DEFAULT_CONTENT["contact_address"]
+    contact_phone: str = DEFAULT_CONTENT["contact_phone"]
+    contact_email: str = DEFAULT_CONTENT["contact_email"]
+    footer_tagline: str = DEFAULT_CONTENT["footer_tagline"]
+    bearers: List[Bearer] = Field(default_factory=lambda: [Bearer(**b) for b in DEFAULT_CONTENT["bearers"]])
+
+
+@api_router.get("/content")
+async def get_content():
+    doc = await db.site_settings.find_one({"slot": "content"})
+    if not doc:
+        return DEFAULT_CONTENT
+    return {k: doc.get(k, DEFAULT_CONTENT.get(k, "")) for k in DEFAULT_CONTENT}
+
+
+@api_router.put("/admin/content")
+async def update_content(payload: SiteContentUpdate, admin: dict = Depends(get_current_admin)):
+    doc = payload.model_dump()
+    doc["slot"] = "content"
+    doc["updated_at"] = datetime.now(timezone.utc).isoformat()
+    await db.site_settings.update_one({"slot": "content"}, {"$set": doc}, upsert=True)
+    logger.info("Homepage content updated")
+    return {k: v for k, v in doc.items() if k not in ("slot", "updated_at")}
+
+
 @api_router.delete("/admin/announcements/{announcement_id}", status_code=204)
 async def delete_announcement(announcement_id: str, admin: dict = Depends(get_current_admin)):
     result = await db.announcements.delete_one({"id": announcement_id})

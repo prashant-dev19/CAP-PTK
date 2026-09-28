@@ -2,19 +2,13 @@ import { useState } from "react";
 import { ChevronDown, Loader2, Check, MapPin, Phone, Mail } from "lucide-react";
 import { api, formatApiError } from "@/lib/api";
 import Reveal, { Eyebrow } from "@/components/Reveal";
+import { useSiteContent } from "@/context/SiteContent";
 
 const SUBJECTS = ["General Enquiry", "Trials & Selection", "Registration Help", "Affiliation & Cricket Matters", "Media"];
 
-const INFO = [
-  { icon: MapPin, label: "Office", value: "Jodhamal Colony, Pathankot" },
-  { icon: Phone, label: "Phone", value: "89680-44334", href: "tel:+918968044334" },
-  { icon: Mail, label: "Email", value: "cricketpathankot@gmail.com", href: "mailto:cricketpathankot@gmail.com" },
-];
-
-const EMPTY = { name: "", email: "", phone: "", subject: "", message: "" };
-
 export default function Contact() {
-  const [form, setForm] = useState(EMPTY);
+  const c = useSiteContent();
+  const [form, setForm] = useState({ name: "", email: "", phone: "", subject: "", message: "" });
   const [busy, setBusy] = useState(false);
   const [done, setDone] = useState(false);
   const [error, setError] = useState("");
@@ -36,9 +30,15 @@ export default function Contact() {
   };
 
   const reset = () => {
-    setForm(EMPTY);
+    setForm({ name: "", email: "", phone: "", subject: "", message: "" });
     setDone(false);
   };
+
+  const INFO = [
+    { icon: MapPin, label: "Office", value: c.contact_address },
+    { icon: Phone, label: "Phone", value: c.contact_phone, href: `tel:${c.contact_phone.replace(/[^+\d]/g, "")}` },
+    { icon: Mail, label: "Email", value: c.contact_email, href: `mailto:${c.contact_email}` },
+  ];
 
   return (
     <section id="contact" className="py-28 md:py-36" data-testid="contact-section">

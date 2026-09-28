@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { ChevronDown, Loader2, Check } from "lucide-react";
 import { api, formatApiError } from "@/lib/api";
-import Reveal, { Eyebrow } from "@/components/Reveal";
+import Reveal from "@/components/Reveal";
+import { useSiteContent } from "@/context/SiteContent";
 
 const EMPTY = {
   full_name: "",
@@ -40,6 +41,7 @@ function SelectWrap({ children }) {
 }
 
 export default function Register() {
+  const c = useSiteContent();
   const [form, setForm] = useState(EMPTY);
   const [busy, setBusy] = useState(false);
   const [done, setDone] = useState(null);
@@ -89,16 +91,20 @@ export default function Register() {
             <div className="mt-12 border border-gold/20 rounded-xl p-6 max-w-xs" data-testid="register-help-box">
               <p className="text-[0.6rem] tracking-[0.28em] uppercase text-gold/80 mb-3">Questions?</p>
               <p className="text-sm text-ivory/60">
-                <a href="tel:+918968044334" data-testid="register-help-phone" className="hover:text-gold transition-colors">
-                  89680-44334
+                <a
+                  href={`tel:${c.contact_phone.replace(/[^+\d]/g, "")}`}
+                  data-testid="register-help-phone"
+                  className="hover:text-gold transition-colors"
+                >
+                  {c.contact_phone}
                 </a>
                 <span className="text-ivory/30 mx-2">·</span>
                 <a
-                  href="mailto:cricketpathankot@gmail.com"
+                  href={`mailto:${c.contact_email}`}
                   data-testid="register-help-email"
                   className="hover:text-gold transition-colors break-all"
                 >
-                  cricketpathankot@gmail.com
+                  {c.contact_email}
                 </a>
               </p>
               <p className="text-[0.62rem] text-ivory/40 mt-4 leading-relaxed">

@@ -124,6 +124,207 @@ function StatCard({ icon: Icon, label, value, testid }) {
   );
 }
 
+function SectionCard({ title, children, testid }) {
+  return (
+    <div className="border border-gold/15 bg-pavilion-mid/40 rounded-xl p-6 md:p-8" data-testid={testid}>
+      <p className="text-[0.62rem] tracking-[0.28em] uppercase text-gold/80 mb-6">{title}</p>
+      {children}
+    </div>
+  );
+}
+
+function HomeContentEditor() {
+  const [form, setForm] = useState(null);
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState("");
+  const [err, setErr] = useState("");
+
+  useEffect(() => {
+    api
+      .get("/content")
+      .then(({ data }) =>
+        setForm({
+          ...data,
+          process_steps: (data?.process_steps || []).map((s) => ({ ...s })),
+          bearers: (data?.bearers || []).map((b) => ({ ...b })),
+          gallery_urls: [...(data?.gallery_urls || [])],
+          about_points: [...(data?.about_points || [])],
+        })
+      )
+      .catch(() => setErr("Could not load content. Reload the page."));
+  }, []);
+
+  if (!form) {
+    return (
+      <div className="flex items-center gap-3 text-ivory/50 text-sm py-16 justify-center">
+        <Loader2 size={18} className="animate-spin text-gold" /> Loading homepage content…
+      </div>
+    );
+  }
+
+  const set = (k) => (e) => setForm({ ...form, [k]: e.target.value });
+  const setList = (k, i, value) =>
+    setForm({ ...form, [k]: form[k].map((v, idx) => (idx === i ? value : v)) });
+  const setStep = (i, key, value) =>
+    setForm({ ...form, process_steps: form.process_steps.map((s, idx) => (idx === i ? { ...s, [key]: value } : s)) });
+  const setBearer = (i, value) =>
+    setForm({ ...form, bearers: form.bearers.map((b, idx) => (idx === i ? { ...b, name: value } : b)) });
+
+  const save = async () => {
+    setBusy(true);
+    setErr("");
+    setMsg("");
+    try {
+      await api.put("/admin/content", form);
+      setMsg("Homepage updated — the live site now shows these texts and images.");
+    } catch (e) {
+      if (e?.response?.status === 401) {
+        setErr("Session expired — please reload the page and sign in again.");
+        return;
+      }
+      setErr(formatApiError(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const tf = (label, key, placeholder, textarea = false, testid) => (
+    <label className="block">
+      <span className="field-label">{label}</span>
+      {textarea ? (
+        <textarea rows={3} className="field resize-none" data-testid={testid} value={form[key]} onChange={set(key)} placeholder={placeholder} />
+      ) : (
+        <input className="field" data-testid={testid} value={form[key]} onChange={set(key)} placeholder={placeholder} />
+      )}
+    </label>
+  );
+
+  return (
+    <div className="space-y-8 max-w-3xl">
+      <p className="text-ivory/50 text-sm leading-relaxed">
+        Edit the texts and images of the home page here and save — the live site updates instantly.
+      </p>
+
+      <SectionCard title="Hero" testid="cms-hero">
+        <div className="space-y-6">
+          {tf("Headline — line 1", "hero_line1", "The Home of", false, "cms-hero-line1")}
+          <div className="grid sm:grid-cols-2 gap-6">
+            {tf("Headline — line 2 (gold italic part)", "hero_line2_gold", "Pathankot", false, "cms-hero-line2-gold")}
+            {tf("Headline — line 2 (rest)", "hero_line2_rest", "Cricket", false, "cms-hero-line2-rest")}
+          </div>
+          {tf("Sub-line", "hero_subline", "Short description under the headline", true, "cms-hero-subline")}
+          {tf("Background image URL", "hero_image", "https:// …", false, "cms-hero-image")}
+        </div>
+      </SectionCard>
+
+      <SectionCard title="Trials strip" testid="cms-trials">
+        <div className="space-y-6">
+          {tf("Label", "trials_label", "District Trials · All Age Groups", false, "cms-trials-label")}
+          {tf("Heading", "trials_heading", "Open trials for U-14 to Seniors…", false, "cms-trials-heading")}
+          {tf("Dates text", "trials_dates", "To be Announced Soon", false, "cms-trials-dates")}
+        </div>
+      </SectionCard>
+
+      <SectionCard title="The Association (about)" testid="cms-about">
+        <div className="space-y-6">
+          {tf("Heading", "about_heading", "", false, "cms-about-heading")}
+          {tf("Paragraph 1", "about_p1", "", true, "cms-about-p1")}
+          {tf("Paragraph 2", "about_p2", "", true, "cms-about-p2")}
+          {tf("Image URL", "about_image", "https:// …", false, "cms-about-image")}
+          <div>
+            <span className="field-label">Checklist points</span>
+            <div className="space-y-3">
+              {form.about_points.map((p, i) => (
+                <input key={i} className="field" data-testid={`cms-about-point-${i}`} value={p} onChange={(e) => setList("about_points", i, e.target.value)} />
+              ))}
+            </div>
+          </div>
+        </div>
+      </SectionCard>
+
+      <SectionCard title="Squads section" testid="cms-teams">
+        <div className="space-y-6">
+          {tf("Heading", "teams_heading", "Nine squads. Two wings.", false, "cms-teams-heading")}
+          {tf("Heading accent (gold italic)", "teams_accent", "One district.", false, "cms-teams-accent")}
+          {tf("Sub-text", "teams_sub", "", true, "cms-teams-sub")}
+        </div>
+      </SectionCard>
+
+      <SectionCard title="The Pathway" testid="cms-process">
+        <div className="space-y-6">
+          {tf("Heading", "process_heading", "", false, "cms-process-heading")}
+          {form.process_steps.map((s, i) => (
+            <div key={i} className="border-t border-gold/10 pt-5">
+              <span className="field-label">Step 0{i + 1}</span>
+              <input className="field" data-testid={`cms-step-title-${i}`} value={s.title} onChange={(e) => setStep(i, "title", e.target.value)} placeholder="Step title" />
+              <textarea rows={2} className="field resize-none mt-3" data-testid={`cms-step-desc-${i}`} value={s.desc} onChange={(e) => setStep(i, "desc", e.target.value)} placeholder="Step description" />
+            </div>
+          ))}
+        </div>
+      </SectionCard>
+
+      <SectionCard title="Gallery" testid="cms-gallery">
+        <div className="space-y-6">
+          {tf("Heading", "gallery_heading", "", false, "cms-gallery-heading")}
+          <div>
+            <span className="field-label">Image URLs (leave blank to remove a photo)</span>
+            <div className="space-y-3">
+              {form.gallery_urls.map((u, i) => (
+                <input key={i} className="field" data-testid={`cms-gallery-url-${i}`} value={u} onChange={(e) => setList("gallery_urls", i, e.target.value)} placeholder={`Image ${i + 1} URL`} />
+              ))}
+            </div>
+          </div>
+        </div>
+      </SectionCard>
+
+      <SectionCard title="Contact details" testid="cms-contact">
+        <div className="space-y-6">
+          {tf("Office address", "contact_address", "", false, "cms-contact-address")}
+          {tf("Phone", "contact_phone", "", false, "cms-contact-phone")}
+          {tf("Email", "contact_email", "", false, "cms-contact-email")}
+        </div>
+      </SectionCard>
+
+      <SectionCard title="Footer — office bearers & tagline" testid="cms-footer">
+        <div className="space-y-6">
+          {tf("Tagline", "footer_tagline", "", true, "cms-footer-tagline")}
+          <div>
+            <span className="field-label">Office bearers</span>
+            <div className="space-y-3">
+              {form.bearers.map((b, i) => (
+                <div key={b.role} className="flex items-end gap-3">
+                  <span className="text-xs text-ivory/50 w-36 pb-3 shrink-0">{b.role}</span>
+                  <input className="field" data-testid={`cms-bearer-${i}`} value={b.name} onChange={(e) => setBearer(i, e.target.value)} placeholder="Name" />
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </SectionCard>
+
+      {msg && (
+        <p className="text-sm text-gold" data-testid="cms-save-msg">
+          {msg}
+        </p>
+      )}
+      {err && (
+        <p className="text-sm text-red-300" data-testid="cms-save-error">
+          {err}
+        </p>
+      )}
+
+      <button
+        onClick={save}
+        disabled={busy}
+        data-testid="cms-save"
+        className="btn-gold bg-gold text-pavilion text-xs tracking-[0.22em] uppercase font-semibold px-10 py-4 rounded-full inline-flex items-center gap-3 disabled:opacity-60"
+      >
+        {busy ? <Loader2 size={14} className="animate-spin" /> : null} Save homepage
+      </button>
+    </div>
+  );
+}
+
 function PopupEditor() {
   const [form, setForm] = useState({ enabled: false, title: "", message: "", image_url: "" });
   const [busy, setBusy] = useState(false);
@@ -553,6 +754,7 @@ function Dashboard({ user, onLogout }) {
               { id: "announcements", label: "Announcements" },
               { id: "squads", label: "Squads" },
               { id: "popup", label: "Pop-up" },
+              { id: "homepage", label: "Homepage" },
             ].map((t) => (
               <button
                 key={t.id}
@@ -781,6 +983,8 @@ function Dashboard({ user, onLogout }) {
           <div className="max-w-2xl">
             <PopupEditor />
           </div>
+        ) : tab === "homepage" ? (
+          <HomeContentEditor />
         ) : msgs.length === 0 ? (
           <p className="text-ivory/40 text-sm py-16 text-center" data-testid="messages-empty">
             No contact messages yet.

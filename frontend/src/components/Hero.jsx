@@ -3,9 +3,7 @@ import { motion, useScroll, useTransform } from "framer-motion";
 import { ArrowDown } from "lucide-react";
 import { LogoMark } from "@/components/Logo";
 import { Reveal } from "@/components/Reveal";
-
-const HERO_IMG =
-  "https://images.unsplash.com/photo-1759733845137-5eb942436f49?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NTY2OTF8MHwxfHNlYXJjaHwzfHxjcmlja2V0JTIwc3RhZGl1bSUyMGdyZWVufGVufDB8fHx8MTc5MDQxNjIzMHww&ixlib=rb-4.1.0&q=85";
+import { useSiteContent } from "@/context/SiteContent";
 
 const STATS = [
   { n: "09", l: "District Squads" },
@@ -20,6 +18,7 @@ const lineAnim = (i) => ({
 });
 
 export default function Hero() {
+  const c = useSiteContent();
   const ref = useRef(null);
   const { scrollYProgress } = useScroll({ target: ref, offset: ["start start", "end start"] });
   const bgY = useTransform(scrollYProgress, [0, 1], ["0%", "22%"]);
@@ -27,11 +26,7 @@ export default function Hero() {
   return (
     <section ref={ref} id="top" className="relative min-h-screen flex flex-col overflow-hidden">
       <motion.div className="absolute inset-0" style={{ y: bgY }}>
-        <img
-          src={HERO_IMG}
-          alt="Cricket stadium under lights"
-          className="w-full h-full object-cover scale-110"
-        />
+        <img src={c.hero_image} alt="Cricket stadium under lights" className="w-full h-full object-cover scale-110" />
         <div className="absolute inset-0 bg-pavilion/75" />
         <div className="absolute inset-0 bg-gradient-to-t from-pavilion via-pavilion/30 to-pavilion/70" />
       </motion.div>
@@ -62,12 +57,12 @@ export default function Hero() {
         <h1 className="font-display font-medium tracking-tight leading-[0.98] text-[15vw] sm:text-7xl md:text-8xl lg:text-[7.2rem]">
           <span className="block overflow-hidden pb-1">
             <motion.span className="block text-ivory" {...lineAnim(0)} data-testid="hero-line-1">
-              The Home of
+              {c.hero_line1}
             </motion.span>
           </span>
           <span className="block overflow-hidden pb-2">
             <motion.span className="block" {...lineAnim(1)} data-testid="hero-line-2">
-              <em className="italic text-gold font-light">Pathankot</em> Cricket
+              <em className="italic text-gold font-light">{c.hero_line2_gold}</em> {c.hero_line2_rest}
             </motion.span>
           </span>
         </h1>
@@ -79,9 +74,7 @@ export default function Hero() {
           className="mt-8 max-w-xl text-ivory/70 text-sm md:text-base leading-relaxed font-light"
           data-testid="hero-subline"
         >
-          The official cricketing body of District Pathankot, affiliated to the Punjab Cricket
-          Association, Mohali — conducting trials, selecting players and fielding squads from
-          U-14 to Seniors, for men and women, into inter-district competition.
+          {c.hero_subline}
         </motion.p>
 
         <motion.div

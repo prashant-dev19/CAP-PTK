@@ -1,18 +1,14 @@
 import Reveal, { Eyebrow } from "@/components/Reveal";
+import { useSiteContent } from "@/context/SiteContent";
 
-const U = "https://images.unsplash.com";
-const Q = "?crop=entropy&cs=srgb&fm=jpg&q=85";
+const CAPTIONS = ["The appeal", "Timber", "Front foot", "Between the wickets", "In the nets", "The drive"];
 
-const PHOTOS = [
-  { src: `${U}/photo-1565787154274-c8d076ad34e7${Q}`, caption: "The appeal", cls: "col-span-2 row-span-2" },
-  { src: `${U}/photo-1593766827228-8737b4534aa6${Q}`, caption: "Timber", cls: "" },
-  { src: `${U}/photo-1595210382051-4d2c31fcc2f4${Q}`, caption: "Front foot", cls: "" },
-  { src: `${U}/photo-1624193757636-b829dfa06a1b${Q}`, caption: "Between the wickets", cls: "col-span-2" },
-  { src: `${U}/photo-1729027696167-0f3aa8e92e64${Q}`, caption: "In the nets", cls: "" },
-  { src: `${U}/photo-1595210382266-2d0077c1f541${Q}`, caption: "The drive", cls: "" },
-];
+const SPANS = ["col-span-2 row-span-2", "", "", "col-span-2", "", ""];
 
 export default function Gallery() {
+  const c = useSiteContent();
+  const urls = (c.gallery_urls || []).filter(Boolean);
+
   return (
     <section id="gallery" className="py-28 md:py-36" data-testid="gallery-section">
       <div className="max-w-7xl mx-auto px-6 md:px-12">
@@ -21,7 +17,7 @@ export default function Gallery() {
             <Eyebrow>Gallery</Eyebrow>
             <Reveal>
               <h2 className="font-display text-4xl md:text-5xl lg:text-6xl tracking-tight text-ivory mt-6 leading-[1.05]">
-                District cricket, <em className="italic text-gold font-light">in pictures</em>.
+                {c.gallery_heading}
               </h2>
             </Reveal>
           </div>
@@ -32,30 +28,41 @@ export default function Gallery() {
           </Reveal>
         </div>
 
-        <Reveal delay={0.1}>
-          <div
-            className="mt-14 grid grid-cols-2 md:grid-cols-4 auto-rows-[150px] md:auto-rows-[200px] gap-3 md:gap-4"
-            data-testid="gallery-grid"
-          >
-            {PHOTOS.map((p) => (
-              <figure
-                key={p.src}
-                className={`relative overflow-hidden rounded-lg group ${p.cls}`}
-                data-testid="gallery-item"
-              >
-                <img
-                  src={p.src}
-                  alt={p.caption}
-                  loading="lazy"
-                  className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
-                />
-                <figcaption className="absolute bottom-0 inset-x-0 bg-gradient-to-t from-pavilion/90 via-pavilion/40 to-transparent px-4 pb-3 pt-8 text-[0.62rem] tracking-[0.22em] uppercase text-ivory/85 opacity-0 group-hover:opacity-100 transition-opacity duration-500">
-                  {p.caption}
-                </figcaption>
-              </figure>
-            ))}
-          </div>
-        </Reveal>
+        {urls.length === 0 ? (
+          <Reveal delay={0.1}>
+            <div
+              className="mt-14 border border-dashed border-gold/25 rounded-xl py-20 text-center text-ivory/40 text-sm"
+              data-testid="gallery-placeholder"
+            >
+              Gallery photographs will be added by the Association.
+            </div>
+          </Reveal>
+        ) : (
+          <Reveal delay={0.1}>
+            <div
+              className="mt-14 grid grid-cols-2 md:grid-cols-4 auto-rows-[150px] md:auto-rows-[200px] gap-3 md:gap-4"
+              data-testid="gallery-grid"
+            >
+              {urls.slice(0, 6).map((src, i) => (
+                <figure
+                  key={src}
+                  className={`relative overflow-hidden rounded-lg group ${SPANS[i] || ""}`}
+                  data-testid="gallery-item"
+                >
+                  <img
+                    src={src}
+                    alt={CAPTIONS[i] || `District cricket ${i + 1}`}
+                    loading="lazy"
+                    className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+                  />
+                  <figcaption className="absolute bottom-0 inset-x-0 bg-gradient-to-t from-pavilion/90 via-pavilion/40 to-transparent px-4 pb-3 pt-8 text-[0.62rem] tracking-[0.22em] uppercase text-ivory/85 opacity-0 group-hover:opacity-100 transition-opacity duration-500">
+                    {CAPTIONS[i] || `District cricket ${i + 1}`}
+                  </figcaption>
+                </figure>
+              ))}
+            </div>
+          </Reveal>
+        )}
 
         <Reveal delay={0.15}>
           <p className="mt-8 text-xs text-ivory/40 tracking-wide">

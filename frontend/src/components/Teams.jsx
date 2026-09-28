@@ -1,5 +1,6 @@
 import { ArrowUpRight } from "lucide-react";
 import Reveal, { Eyebrow } from "@/components/Reveal";
+import { useSiteContent } from "@/context/SiteContent";
 
 const WINGS = [
   {
@@ -28,6 +29,7 @@ const WINGS = [
 ];
 
 export default function Teams() {
+  const c = useSiteContent();
   return (
     <section id="teams" className="py-28 md:py-36 bg-pavilion-deep/40 border-y border-gold/10" data-testid="teams-section">
       <div className="max-w-7xl mx-auto px-6 md:px-12">
@@ -36,17 +38,14 @@ export default function Teams() {
             <Eyebrow>Squads</Eyebrow>
             <Reveal>
               <h2 className="font-display text-4xl md:text-5xl lg:text-6xl tracking-tight text-ivory mt-6 leading-[1.08]">
-                Nine squads. Two wings.
+                {c.teams_heading}
                 <br />
-                <em className="italic text-gold font-light">One district.</em>
+                <em className="italic text-gold font-light">{c.teams_accent}</em>
               </h2>
             </Reveal>
           </div>
           <Reveal delay={0.1}>
-            <p className="max-w-sm text-ivory/55 text-sm leading-relaxed">
-              Selections are held for every category, for men and women alike. Registered players
-              are called to trials as squads are formalised.
-            </p>
+            <p className="max-w-sm text-ivory/55 text-sm leading-relaxed">{c.teams_sub}</p>
           </Reveal>
         </div>
 

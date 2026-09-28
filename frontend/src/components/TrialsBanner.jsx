@@ -1,7 +1,9 @@
 import { CalendarDays } from "lucide-react";
 import { Reveal } from "@/components/Reveal";
+import { useSiteContent } from "@/context/SiteContent";
 
 export default function TrialsBanner() {
+  const c = useSiteContent();
   return (
     <section className="py-16 md:py-20" data-testid="trials-banner-section">
       <div className="max-w-7xl mx-auto px-6 md:px-12">
@@ -12,17 +14,15 @@ export default function TrialsBanner() {
                 <CalendarDays size={18} />
               </span>
               <div>
-                <p className="text-[0.62rem] tracking-[0.3em] uppercase text-gold/80">
-                  District Trials · All Age Groups
-                </p>
+                <p className="text-[0.62rem] tracking-[0.3em] uppercase text-gold/80">{c.trials_label}</p>
                 <p className="font-display text-2xl md:text-3xl text-ivory mt-1 leading-snug">
-                  Open trials for U-14 to Seniors — <em className="italic text-gold font-light">men &amp; women</em>.
+                  {c.trials_heading}
                 </p>
               </div>
             </div>
             <div className="md:text-right" data-testid="trials-dates">
               <p className="text-[0.62rem] tracking-[0.3em] uppercase text-ivory/40">Dates</p>
-              <p className="font-display text-2xl md:text-3xl text-gold italic mt-1">To be Announced Soon</p>
+              <p className="font-display text-2xl md:text-3xl text-gold italic mt-1">{c.trials_dates}</p>
             </div>
           </div>
         </Reveal>
