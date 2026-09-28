@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { LogOut, Loader2, Lock, ClipboardList, Inbox, Megaphone, Trash2, Pin, Download, Instagram, Plus } from "lucide-react";
 import { WhatsAppIcon } from "@/components/icons";
-import { NoticeModal, padNo } from "@/components/NoticesList";
+import { NoticeModal, Pagination, padNo } from "@/components/NoticesList";
 import ApprovalsTab from "@/components/admin/ApprovalsTab";
 import UsersTab from "@/components/admin/UsersTab";
 import { api, formatApiError } from "@/lib/api";
@@ -648,6 +648,7 @@ function Dashboard({ user, onLogout }) {
   const [regs, setRegs] = useState(null);
   const [msgs, setMsgs] = useState(null);
   const [anns, setAnns] = useState(null);
+  const [annMeta, setAnnMeta] = useState(null);
   const [squads, setSquads] = useState(null);
   const [error, setError] = useState("");
   const [annForm, setAnnForm] = useState({ title: "", body: "", link_url: "" });
@@ -656,18 +657,30 @@ function Dashboard({ user, onLogout }) {
   const [selectedAnn, setSelectedAnn] = useState(null);
   const [info, setInfo] = useState("");
 
+  const loadAnns = async (p = 1) => {
+    try {
+      const { data } = await api.get(`/admin/announcements?page=${p}&limit=10`);
+      setAnns(data.items || []);
+      setAnnMeta({ total: data.total, page: data.page, pages: data.pages, limit: data.limit });
+    } catch (e) {
+      if (e?.response?.status === 401) {
+        onLogout();
+        return;
+      }
+      setError(formatApiError(e));
+    }
+  };
+
   const load = async () => {
     setError("");
     try {
-      const [r, m, a, sq] = await Promise.all([
+      const [r, m, sq] = await Promise.all([
         api.get("/admin/registrations"),
         api.get("/admin/messages"),
-        api.get("/admin/announcements").catch(() => []),
         api.get("/squads").catch(() => []),
       ]);
       setRegs(r.data);
       setMsgs(m.data);
-      setAnns(Array.isArray(a.data) ? a.data : []);
       setSquads(Array.isArray(sq.data) ? sq.data : []);
     } catch (e) {
       if (e?.response?.status === 401) {
@@ -676,6 +689,7 @@ function Dashboard({ user, onLogout }) {
       }
       setError(formatApiError(e));
     }
+    await loadAnns();
   };
 
   useEffect(() => {
@@ -689,12 +703,11 @@ function Dashboard({ user, onLogout }) {
     setAnnError("");
     try {
       const { data: created } = await api.post("/admin/announcements", annForm);
-      setAnnForm({ title: "", body: "" });
+      setAnnForm({ title: "", body: "", link_url: "" });
       if (created?.pending) {
         setInfo("Submitted — an admin must approve it before it appears on the site.");
       } else {
-        const { data } = await api.get("/admin/announcements");
-        setAnns(data);
+        await loadAnns(1);
       }
     } catch (err) {
       if (err?.response?.status === 401) {
@@ -714,7 +727,9 @@ function Dashboard({ user, onLogout }) {
       if (res.status === 200 && res.data?.pending) {
         setInfo("Delete submitted for admin approval.");
       } else {
-        setAnns((prev) => prev.filter((a) => a.id !== id));
+        const currentPage = annMeta?.page ?? 1;
+        const onLastPage = anns.length === 1 && currentPage > 1;
+        await loadAnns(onLastPage ? currentPage - 1 : currentPage);
       }
     } catch (e) {
       setError(formatApiError(e));
@@ -727,7 +742,7 @@ function Dashboard({ user, onLogout }) {
       if (data?.pending) {
         setInfo("Pin change submitted for admin approval.");
       } else {
-        setAnns((prev) => prev.map((a) => (a.id === id ? data : a)));
+        await loadAnns(annMeta?.page ?? 1);
       }
     } catch (e) {
       if (e?.response?.status === 401) {
@@ -773,7 +788,7 @@ function Dashboard({ user, onLogout }) {
         <div className="grid grid-cols-2 lg:grid-cols-3 gap-4 mb-10">
           <StatCard icon={ClipboardList} label="Player Registrations" value={loading ? "—" : regs.length} testid="stat-registrations" />
           <StatCard icon={Inbox} label="Contact Messages" value={loading ? "—" : msgs.length} testid="stat-messages" />
-          <StatCard icon={Megaphone} label="Announcements" value={loading ? "—" : anns.length} testid="stat-announcements" />
+          <StatCard icon={Megaphone} label="Announcements" value={loading ? "—" : (annMeta?.total ?? anns.length)} testid="stat-announcements" />
         </div>
 
         <div className="flex items-center justify-between gap-6 border-b border-gold/15 mb-8">
@@ -1024,6 +1039,17 @@ function Dashboard({ user, onLogout }) {
                       </div>
                     </div>
                   ))}
+                </div>
+              )}
+              {annMeta && anns.length > 0 && (
+                <div className="mt-8 flex flex-col items-center gap-3" data-testid="admin-notices-pagination-wrap">
+                  <p
+                    className="text-[0.6rem] tracking-[0.2em] uppercase text-ivory/40"
+                    data-testid="admin-notices-count"
+                  >
+                    Page {annMeta.page} of {annMeta.pages} · {annMeta.total} notices
+                  </p>
+                  <Pagination page={annMeta.page} pages={annMeta.pages} onPage={loadAnns} testPrefix="admin-notices" />
                 </div>
               )}
               <NoticeModal notice={selectedAnn} onClose={() => setSelectedAnn(null)} />

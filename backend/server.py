@@ -183,16 +183,44 @@ class Announcement(AnnouncementCreate):
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
-@api_router.get("/announcements", response_model=List[Announcement])
-async def list_announcements():
-    docs = await db.announcements.find().sort([("pinned", -1), ("created_at", -1)]).to_list(200)
-    return [Announcement(**d) for d in docs]
+class AnnouncementsPage(BaseModel):
+    items: List[Announcement]
+    total: int
+    page: int
+    pages: int
+    limit: int
 
 
-@api_router.get("/admin/announcements", response_model=List[Announcement])
-async def list_announcements_admin(admin: dict = Depends(get_current_user)):
-    docs = await db.announcements.find().sort([("pinned", -1), ("created_at", -1)]).to_list(200)
-    return [Announcement(**d) for d in docs]
+async def fetch_announcements_page(page: int, limit: int) -> AnnouncementsPage:
+    limit = max(1, min(limit, 50))
+    total = await db.announcements.count_documents({})
+    pages = max(1, (total + limit - 1) // limit)
+    current = max(1, min(page, pages))
+    docs = (
+        await db.announcements.find()
+        .sort([("pinned", -1), ("created_at", -1)])
+        .skip((current - 1) * limit)
+        .to_list(limit)
+    )
+    return AnnouncementsPage(
+        items=[Announcement(**d) for d in docs],
+        total=total,
+        page=current,
+        pages=pages,
+        limit=limit,
+    )
+
+
+@api_router.get("/announcements", response_model=AnnouncementsPage)
+async def list_announcements(page: int = 1, limit: int = 10):
+    return await fetch_announcements_page(page, limit)
+
+
+@api_router.get("/admin/announcements", response_model=AnnouncementsPage)
+async def list_announcements_admin(
+    user: dict = Depends(get_current_user), page: int = 1, limit: int = 10
+):
+    return await fetch_announcements_page(page, limit)
 
 
 @api_router.post("/admin/announcements")

@@ -18,7 +18,7 @@ export default function Navbar() {
   useEffect(() => {
     api
       .get("/announcements")
-      .then(({ data }) => setNotice(data && data.length ? data[0] : null))
+      .then(({ data }) => setNotice(data?.items?.[0] || null))
       .catch(() => setNotice(null));
   }, []);
 

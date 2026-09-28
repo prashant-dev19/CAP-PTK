@@ -8,13 +8,20 @@ import Reveal, { Eyebrow } from "@/components/Reveal";
 
 export default function Announcements() {
   const [items, setItems] = useState([]);
+  const [total, setTotal] = useState(0);
   const [selected, setSelected] = useState(null);
 
   useEffect(() => {
     api
-      .get("/announcements")
-      .then(({ data }) => setItems(data || []))
-      .catch(() => setItems([]));
+      .get("/announcements?page=1&limit=10")
+      .then(({ data }) => {
+        setItems(data?.items || []);
+        setTotal(data?.total || 0);
+      })
+      .catch(() => {
+        setItems([]);
+        setTotal(0);
+      });
   }, []);
 
   if (!items.length) return null;
@@ -22,7 +29,7 @@ export default function Announcements() {
   const pinned = items.find((a) => a.pinned) || null;
   const rest = items.filter((a) => !a.pinned);
   const tableNotices = rest.slice(0, 5);
-  const hasMore = rest.length > 5;
+  const hasMore = total > (pinned ? 1 : 0) + 5;
 
   return (
     <section

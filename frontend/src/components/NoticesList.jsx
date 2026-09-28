@@ -176,3 +176,65 @@ export function NoticeModal({ notice, onClose }) {
     </AnimatePresence>
   );
 }
+
+export function Pagination({ page, pages, onPage, testPrefix = "notices" }) {
+  if (!pages || pages <= 1) return null;
+  const nums = [];
+  if (pages <= 7) {
+    for (let i = 1; i <= pages; i++) nums.push(i);
+  } else {
+    nums.push(1);
+    if (page > 3) nums.push("gap");
+    for (let i = Math.max(2, page - 1); i <= Math.min(pages - 1, page + 1); i++) nums.push(i);
+    if (page < pages - 2) nums.push("gap");
+    nums.push(pages);
+  }
+  const pill = (active) =>
+    `min-w-9 h-9 px-3.5 inline-flex items-center justify-center rounded-full text-[0.65rem] tracking-[0.14em] transition-colors ${
+      active
+        ? "bg-gold text-pavilion font-semibold"
+        : "border border-gold/30 text-gold/80 hover:bg-gold hover:text-pavilion"
+    }`;
+  return (
+    <nav
+      className="flex items-center justify-center gap-2 flex-wrap"
+      data-testid={`${testPrefix}-pagination`}
+      aria-label="Pagination"
+    >
+      <button
+        onClick={() => onPage(page - 1)}
+        disabled={page <= 1}
+        data-testid={`${testPrefix}-prev`}
+        className={`${pill(false)} px-5 uppercase disabled:opacity-35 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-gold/80`}
+      >
+        Prev
+      </button>
+      {nums.map((n, i) =>
+        n === "gap" ? (
+          <span key={`gap-${i}`} className="text-ivory/40 text-sm px-1" data-testid={`${testPrefix}-ellipsis-${i}`}>
+            …
+          </span>
+        ) : (
+          <button
+            key={n}
+            onClick={() => onPage(n)}
+            data-testid={`${testPrefix}-page-${n}`}
+            aria-label={`Page ${n}`}
+            aria-current={n === page ? "page" : undefined}
+            className={pill(n === page)}
+          >
+            {n}
+          </button>
+        )
+      )}
+      <button
+        onClick={() => onPage(page + 1)}
+        disabled={page >= pages}
+        data-testid={`${testPrefix}-next`}
+        className={`${pill(false)} px-5 uppercase disabled:opacity-35 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-gold/80`}
+      >
+        Next
+      </button>
+    </nav>
+  );
+}

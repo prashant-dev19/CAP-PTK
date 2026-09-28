@@ -2,20 +2,37 @@ import { useEffect, useState } from "react";
 import { Loader2 } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
-import { NoticeTable, NoticeModal } from "@/components/NoticesList";
+import { NoticeTable, NoticeModal, Pagination } from "@/components/NoticesList";
 import { api } from "@/lib/api";
 import Reveal, { Eyebrow } from "@/components/Reveal";
 
 export default function NoticesPage() {
   const [items, setItems] = useState(null);
+  const [meta, setMeta] = useState(null);
   const [selected, setSelected] = useState(null);
 
-  useEffect(() => {
+  const loadPage = (p) => {
     api
-      .get("/announcements")
-      .then(({ data }) => setItems(data || []))
-      .catch(() => setItems([]));
+      .get(`/announcements?page=${p}&limit=10`)
+      .then(({ data }) => {
+        setItems(data.items || []);
+        setMeta({ total: data.total, page: data.page, pages: data.pages, limit: data.limit });
+      })
+      .catch(() => {
+        setItems([]);
+        setMeta(null);
+      });
+  };
+
+  useEffect(() => {
+    loadPage(1);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  const goToPage = (p) => {
+    loadPage(p);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
 
   return (
     <div className="relative min-h-screen bg-pavilion text-ivory font-body" data-testid="notices-page">
@@ -47,9 +64,25 @@ export default function NoticesPage() {
               No notices have been posted yet.
             </p>
           ) : (
-            <Reveal>
-              <NoticeTable notices={items} onSelect={setSelected} showPin />
-            </Reveal>
+            <>
+              <Reveal>
+                <NoticeTable notices={items} onSelect={setSelected} showPin />
+              </Reveal>
+              <div className="mt-12 flex flex-col items-center gap-4">
+                {meta && meta.total > 0 && (
+                  <p
+                    className="text-[0.62rem] tracking-[0.24em] uppercase text-ivory/40"
+                    data-testid="notices-count"
+                  >
+                    Showing {(meta.page - 1) * meta.limit + 1}–
+                    {Math.min(meta.total, meta.page * meta.limit)} of {meta.total} notices
+                  </p>
+                )}
+                {meta && (
+                  <Pagination page={meta.page} pages={meta.pages} onPage={goToPage} testPrefix="notices" />
+                )}
+              </div>
+            </>
           )}
         </div>
       </main>
