@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Pin } from "lucide-react";
+import { Pin, ExternalLink } from "lucide-react";
 import { Link } from "react-router-dom";
 import { ArrowRight } from "lucide-react";
 import { NoticeTable, NoticeModal, padNo } from "@/components/NoticesList";
@@ -74,6 +74,17 @@ export default function Announcements() {
               </p>
               <h3 className="font-display text-2xl md:text-3xl text-ivory mt-3">{pinned.title}</h3>
               <p className="text-sm text-ivory/60 leading-relaxed mt-3 whitespace-pre-line max-w-3xl">{pinned.body}</p>
+              {pinned.link_url && (
+                <a
+                  href={pinned.link_url}
+                  target="_blank"
+                  rel="noreferrer noopener"
+                  data-testid="pinned-notice-link"
+                  className="mt-5 inline-flex items-center gap-2 text-[0.62rem] tracking-[0.22em] uppercase border border-gold/40 text-gold rounded-full px-5 py-2.5 hover:bg-gold hover:text-pavilion transition-colors"
+                >
+                  <ExternalLink size={12} /> Open link
+                </a>
+              )}
             </article>
           </Reveal>
         )}

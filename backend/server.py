@@ -175,6 +175,7 @@ class AnnouncementCreate(BaseModel):
     body: str = Field(min_length=3, max_length=4000)
     pinned: bool = False
     notice_no: int = 0
+    link_url: str = Field(default="", max_length=600)
 
 
 class Announcement(AnnouncementCreate):
@@ -196,14 +197,19 @@ async def list_announcements_admin(admin: dict = Depends(get_current_user)):
 
 @api_router.post("/admin/announcements")
 async def create_announcement(payload: AnnouncementCreate, user: dict = Depends(get_current_user)):
+    dump = payload.model_dump()
+    link = (dump.get("link_url") or "").strip()
+    if link and not link.startswith(("http://", "https://")):
+        link = f"https://{link}"
+    dump["link_url"] = link
     if user.get("role") != "admin":
         await create_pending_change(
-            "announcement", "create", payload.model_dump(), user, f'New notice — "{payload.title}"'
+            "announcement", "create", dump, user, f'New notice — "{payload.title}"'
         )
         return {"pending": True}
     last = await db.announcements.find_one(sort=[("notice_no", -1)])
     notice_no = ((last or {}).get("notice_no", 0)) + 1
-    ann = Announcement(**{**payload.model_dump(), "notice_no": notice_no})
+    ann = Announcement(**{**dump, "notice_no": notice_no})
     doc = ann.model_dump()
     doc["created_at"] = doc["created_at"].isoformat()
     await db.announcements.insert_one(doc)

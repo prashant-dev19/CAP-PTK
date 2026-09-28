@@ -650,7 +650,7 @@ function Dashboard({ user, onLogout }) {
   const [anns, setAnns] = useState(null);
   const [squads, setSquads] = useState(null);
   const [error, setError] = useState("");
-  const [annForm, setAnnForm] = useState({ title: "", body: "" });
+  const [annForm, setAnnForm] = useState({ title: "", body: "", link_url: "" });
   const [annBusy, setAnnBusy] = useState(false);
   const [annError, setAnnError] = useState("");
   const [selectedAnn, setSelectedAnn] = useState(null);
@@ -928,6 +928,19 @@ function Dashboard({ user, onLogout }) {
                   maxLength={4000}
                 />
               </label>
+
+              <label className="block">
+                <span className="field-label">Link (optional)</span>
+                <input
+                  className="field"
+                  data-testid="announcement-link"
+                  value={annForm.link_url}
+                  onChange={(e) => setAnnForm({ ...annForm, link_url: e.target.value })}
+                  placeholder="https:// … becomes a clickable link with the notice"
+                  maxLength={600}
+                />
+              </label>
+
               {annError && (
                 <p className="text-sm text-red-300 mt-4" data-testid="announcement-error">
                   {annError}

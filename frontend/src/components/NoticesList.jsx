@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { Pin, Instagram, X, ArrowUpRight } from "lucide-react";
+import { Pin, Instagram, X, ArrowUpRight, Link2, ExternalLink } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
 import { WhatsAppIcon } from "@/components/icons";
 
@@ -73,6 +73,19 @@ export function NoticeTable({ notices, onSelect, showPin = false }) {
           <span className="text-[0.6rem] tracking-[0.2em] uppercase text-ivory/45">{fmtDate(a.created_at)}</span>
           <span className="font-display text-xl md:text-2xl text-ivory leading-snug flex items-center gap-2.5 flex-wrap">
             {a.title}
+            {a.link_url && (
+              <a
+                href={a.link_url}
+                target="_blank"
+                rel="noreferrer noopener"
+                data-testid={`notice-link-${a.id}`}
+                aria-label="Open notice link"
+                title={a.link_url}
+                className="text-gold/70 hover:text-gold transition-colors inline-flex"
+              >
+                <Link2 size={15} />
+              </a>
+            )}
             {showPin && a.pinned && (
               <span className="inline-flex items-center gap-1 text-[0.55rem] tracking-[0.22em] uppercase text-gold border border-gold/40 rounded-full px-2.5 py-0.5">
                 <Pin size={9} /> Pinned
@@ -143,6 +156,17 @@ export function NoticeModal({ notice, onClose }) {
             <p className="text-[0.6rem] tracking-[0.25em] uppercase text-gold/70 mt-3">{fmtDate(notice.created_at)}</p>
             <h3 className="font-display text-3xl md:text-4xl text-ivory mt-4 leading-snug pr-8">{notice.title}</h3>
             <p className="text-sm text-ivory/70 leading-relaxed mt-6 whitespace-pre-line">{notice.body}</p>
+            {notice.link_url && (
+              <a
+                href={notice.link_url}
+                target="_blank"
+                rel="noreferrer noopener"
+                data-testid="notice-modal-link"
+                className="mt-6 inline-flex items-center gap-2 text-[0.62rem] tracking-[0.22em] uppercase border border-gold/40 text-gold rounded-full px-5 py-2.5 hover:bg-gold hover:text-pavilion transition-colors"
+              >
+                <ExternalLink size={12} /> Open link
+              </a>
+            )}
             <div className="mt-8 pt-6 border-t border-gold/10">
               <ShareRow notice={notice} compact />
             </div>
