@@ -2,6 +2,8 @@ import { useEffect, useState } from "react";
 import { LogOut, Loader2, Lock, ClipboardList, Inbox, Megaphone, Trash2, Pin, Download, Instagram, Plus } from "lucide-react";
 import { WhatsAppIcon } from "@/components/icons";
 import { NoticeModal, padNo } from "@/components/NoticesList";
+import ApprovalsTab from "@/components/admin/ApprovalsTab";
+import UsersTab from "@/components/admin/UsersTab";
 import { api, formatApiError } from "@/lib/api";
 import { LogoMark } from "@/components/Logo";
 
@@ -351,17 +353,21 @@ function PopupEditor() {
     setMsg("");
     try {
       const { data } = await api.put("/admin/popup", form);
-      setForm({
-        enabled: !!data.enabled,
-        title: data.title || "",
-        message: data.message || "",
-        image_url: data.image_url || "",
-      });
-      setMsg(
-        data.enabled
-          ? "Pop-up is live on the home page — visitors will see it once per session."
-          : "Pop-up is turned off."
-      );
+      if (data?.pending) {
+        setMsg("Submitted — an admin must approve it before it goes live.");
+      } else {
+        setForm({
+          enabled: !!data.enabled,
+          title: data.title || "",
+          message: data.message || "",
+          image_url: data.image_url || "",
+        });
+        setMsg(
+          data.enabled
+            ? "Pop-up is live on the home page — visitors will see it once per session."
+            : "Pop-up is turned off."
+        );
+      }
     } catch (e) {
       if (e?.response?.status === 401) {
         setErr("Session expired — please reload the page and sign in again.");
@@ -493,8 +499,13 @@ function SquadEditor({ squad, onSaved }) {
           jersey_number: p.jersey_number === "" || p.jersey_number == null ? null : Number(p.jersey_number),
         }));
       const { data } = await api.put(`/admin/squads/${squad.id}`, { group_photo: photo, players: clean });
-      onSaved(data);
-      setMsg(`Saved — ${clean.length} player${clean.length === 1 ? "" : "s"} in the ${data.age_group} squad.`);
+      if (data?.pending) {
+        onSaved(null);
+        setMsg("Submitted — an admin must approve it before it goes live.");
+      } else {
+        onSaved(data);
+        setMsg(`Saved — ${clean.length} player${clean.length === 1 ? "" : "s"} in the ${data.age_group} squad.`);
+      }
     } catch (e) {
       if (e?.response?.status === 401) {
         setErr("Session expired — please reload the page and sign in again.");
@@ -643,6 +654,7 @@ function Dashboard({ user, onLogout }) {
   const [annBusy, setAnnBusy] = useState(false);
   const [annError, setAnnError] = useState("");
   const [selectedAnn, setSelectedAnn] = useState(null);
+  const [info, setInfo] = useState("");
 
   const load = async () => {
     setError("");
@@ -676,10 +688,14 @@ function Dashboard({ user, onLogout }) {
     setAnnBusy(true);
     setAnnError("");
     try {
-      await api.post("/admin/announcements", annForm);
+      const { data: created } = await api.post("/admin/announcements", annForm);
       setAnnForm({ title: "", body: "" });
-      const { data } = await api.get("/admin/announcements");
-      setAnns(data);
+      if (created?.pending) {
+        setInfo("Submitted — an admin must approve it before it appears on the site.");
+      } else {
+        const { data } = await api.get("/admin/announcements");
+        setAnns(data);
+      }
     } catch (err) {
       if (err?.response?.status === 401) {
         onLogout();
@@ -694,8 +710,12 @@ function Dashboard({ user, onLogout }) {
   const deleteAnnouncement = async (id) => {
     if (!window.confirm("Delete this announcement?")) return;
     try {
-      await api.delete(`/admin/announcements/${id}`);
-      setAnns((prev) => prev.filter((a) => a.id !== id));
+      const res = await api.delete(`/admin/announcements/${id}`);
+      if (res.status === 200 && res.data?.pending) {
+        setInfo("Delete submitted for admin approval.");
+      } else {
+        setAnns((prev) => prev.filter((a) => a.id !== id));
+      }
     } catch (e) {
       setError(formatApiError(e));
     }
@@ -704,7 +724,11 @@ function Dashboard({ user, onLogout }) {
   const togglePin = async (id) => {
     try {
       const { data } = await api.post(`/admin/announcements/${id}/pin`);
-      setAnns((prev) => prev.map((a) => (a.id === id ? data : a)));
+      if (data?.pending) {
+        setInfo("Pin change submitted for admin approval.");
+      } else {
+        setAnns((prev) => prev.map((a) => (a.id === id ? data : a)));
+      }
     } catch (e) {
       if (e?.response?.status === 401) {
         onLogout();
@@ -727,6 +751,12 @@ function Dashboard({ user, onLogout }) {
           <div className="flex items-center gap-6">
             <span className="hidden sm:block text-xs text-ivory/50" data-testid="admin-user-email">
               {user?.email}
+            </span>
+            <span
+              data-testid="admin-role-badge"
+              className="text-[0.55rem] tracking-[0.2em] uppercase border border-gold/40 text-gold rounded-full px-2.5 py-1"
+            >
+              {user?.role === "admin" ? "Admin" : "Editor"}
             </span>
             <button
               onClick={onLogout}
@@ -755,6 +785,12 @@ function Dashboard({ user, onLogout }) {
               { id: "squads", label: "Squads" },
               { id: "popup", label: "Pop-up" },
               { id: "homepage", label: "Homepage" },
+              ...(user?.role === "admin"
+                ? [
+                    { id: "approvals", label: "Approvals" },
+                    { id: "users", label: "Users" },
+                  ]
+                : []),
             ].map((t) => (
               <button
                 key={t.id}
@@ -780,6 +816,7 @@ function Dashboard({ user, onLogout }) {
         </div>
 
         {error && <p className="text-sm text-red-300 mb-6" data-testid="admin-error">{error}</p>}
+        {info && <p className="text-sm text-gold mb-6" data-testid="admin-info">{info}</p>}
 
         {loading ? (
           <div className="flex items-center gap-3 text-ivory/50 text-sm py-16 justify-center">
@@ -850,7 +887,7 @@ function Dashboard({ user, onLogout }) {
                       <SquadEditor
                         key={s.id}
                         squad={s}
-                        onSaved={(u) => setSquads((prev) => prev.map((x) => (x.id === u.id ? u : x)))}
+                        onSaved={(u) => u && setSquads((prev) => prev.map((x) => (x.id === u.id ? u : x)))}
                       />
                     ))}
                   </div>
@@ -985,6 +1022,10 @@ function Dashboard({ user, onLogout }) {
           </div>
         ) : tab === "homepage" ? (
           <HomeContentEditor />
+        ) : tab === "approvals" ? (
+          <ApprovalsTab onChanged={load} />
+        ) : tab === "users" ? (
+          <UsersTab currentUser={user} />
         ) : msgs.length === 0 ? (
           <p className="text-ivory/40 text-sm py-16 text-center" data-testid="messages-empty">
             No contact messages yet.

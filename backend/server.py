@@ -111,7 +111,7 @@ def create_refresh_token(user: dict) -> str:
     return jwt.encode(payload, get_jwt_secret(), algorithm=JWT_ALGORITHM)
 
 
-async def get_current_admin(request: Request) -> dict:
+async def get_current_user(request: Request) -> dict:
     token = request.cookies.get("access_token")
     if not token:
         auth_header = request.headers.get("Authorization", "")
@@ -130,7 +130,13 @@ async def get_current_admin(request: Request) -> dict:
     user = await db.users.find_one({"id": payload["sub"]})
     if not user:
         raise HTTPException(status_code=401, detail="User not found")
-    return {"id": user["id"], "email": user["email"], "role": user.get("role", "admin")}
+    return {"id": user["id"], "email": user["email"], "role": user.get("role", "editor")}
+
+
+async def require_admin(user: dict = Depends(get_current_user)) -> dict:
+    if user.get("role", "editor") != "admin":
+        raise HTTPException(status_code=403, detail="Admin role required")
+    return user
 
 
 # ---------------- Public endpoints ----------------
@@ -183,13 +189,18 @@ async def list_announcements():
 
 
 @api_router.get("/admin/announcements", response_model=List[Announcement])
-async def list_announcements_admin(admin: dict = Depends(get_current_admin)):
+async def list_announcements_admin(admin: dict = Depends(get_current_user)):
     docs = await db.announcements.find().sort([("pinned", -1), ("created_at", -1)]).to_list(200)
     return [Announcement(**d) for d in docs]
 
 
-@api_router.post("/admin/announcements", response_model=Announcement, status_code=201)
-async def create_announcement(payload: AnnouncementCreate, admin: dict = Depends(get_current_admin)):
+@api_router.post("/admin/announcements")
+async def create_announcement(payload: AnnouncementCreate, user: dict = Depends(get_current_user)):
+    if user.get("role") != "admin":
+        await create_pending_change(
+            "announcement", "create", payload.model_dump(), user, f'New notice — "{payload.title}"'
+        )
+        return {"pending": True}
     last = await db.announcements.find_one(sort=[("notice_no", -1)])
     notice_no = ((last or {}).get("notice_no", 0)) + 1
     ann = Announcement(**{**payload.model_dump(), "notice_no": notice_no})
@@ -201,11 +212,20 @@ async def create_announcement(payload: AnnouncementCreate, admin: dict = Depends
 
 
 @api_router.post("/admin/announcements/{announcement_id}/pin", response_model=Announcement)
-async def toggle_pin_announcement(announcement_id: str, admin: dict = Depends(get_current_admin)):
+async def toggle_pin_announcement(announcement_id: str, user: dict = Depends(get_current_user)):
     doc = await db.announcements.find_one({"id": announcement_id})
     if not doc:
         raise HTTPException(status_code=404, detail="Announcement not found")
     new_pinned = not doc.get("pinned", False)
+    if user.get("role") != "admin":
+        await create_pending_change(
+            "announcement",
+            "pin",
+            {"announcement_id": announcement_id, "pinned": new_pinned},
+            user,
+            f"{'Pin' if new_pinned else 'Unpin'} notice #{doc.get('notice_no', 0)}",
+        )
+        return {"pending": True}
     if new_pinned:
         await db.announcements.update_many({"pinned": True}, {"$set": {"pinned": False}})
     await db.announcements.update_one({"id": announcement_id}, {"$set": {"pinned": new_pinned}})
@@ -214,7 +234,7 @@ async def toggle_pin_announcement(announcement_id: str, admin: dict = Depends(ge
 
 
 @api_router.get("/admin/registrations/export")
-async def export_registrations_csv(admin: dict = Depends(get_current_admin)):
+async def export_registrations_csv(admin: dict = Depends(get_current_user)):
     import csv
     import io
 
@@ -280,17 +300,85 @@ async def list_squads():
     return [SquadOut(**d) for d in docs]
 
 
+def now_iso() -> str:
+    return datetime.now(timezone.utc).isoformat()
+
+
+async def create_pending_change(resource: str, action: str, payload: dict, user: dict, summary: str):
+    await db.pending_changes.insert_one({
+        "id": str(uuid.uuid4()),
+        "resource": resource,
+        "action": action,
+        "payload": payload,
+        "summary": summary,
+        "proposed_by": user.get("email", ""),
+        "proposed_by_role": user.get("role", "editor"),
+        "created_at": now_iso(),
+        "status": "pending",
+    })
+    logger.info(f"Pending change queued ({resource}.{action}) by {user.get('email')}")
+
+
+async def apply_pending_change(change: dict):
+    resource = change["resource"]
+    action = change["action"]
+    payload = change.get("payload") or {}
+
+    if resource == "content":
+        doc = {**payload, "slot": "content", "updated_at": now_iso()}
+        await db.site_settings.update_one({"slot": "content"}, {"$set": doc}, upsert=True)
+    elif resource == "popup":
+        doc = {**payload, "slot": "popup", "updated_at": now_iso()}
+        await db.site_settings.update_one({"slot": "popup"}, {"$set": doc}, upsert=True)
+    elif resource == "squad" and action == "update":
+        squad = await db.squads.find_one({"id": payload.get("squad_id")})
+        if squad:
+            fields = {"players": payload.get("players", []), "updated_at": now_iso()}
+            if payload.get("group_photo") is not None:
+                fields["group_photo"] = payload["group_photo"]
+            await db.squads.update_one({"id": payload["squad_id"]}, {"$set": fields})
+    elif resource == "announcement":
+        if action == "create":
+            last = await db.announcements.find_one(sort=[("notice_no", -1)])
+            notice_no = ((last or {}).get("notice_no", 0)) + 1
+            ann = {
+                **payload,
+                "id": str(uuid.uuid4()),
+                "notice_no": notice_no,
+                "created_at": now_iso(),
+            }
+            ann.pop("pending", None)
+            await db.announcements.insert_one(ann)
+        elif action == "delete":
+            await db.announcements.delete_one({"id": payload.get("announcement_id")})
+        elif action == "pin":
+            if payload.get("pinned"):
+                await db.announcements.update_many({"pinned": True}, {"$set": {"pinned": False}})
+            await db.announcements.update_one(
+                {"id": payload.get("announcement_id")}, {"$set": {"pinned": bool(payload.get("pinned"))}}
+            )
+
+
 @api_router.put("/admin/squads/{squad_id}", response_model=SquadOut)
-async def update_squad(squad_id: str, payload: SquadUpdate, admin: dict = Depends(get_current_admin)):
+async def update_squad(squad_id: str, payload: SquadUpdate, user: dict = Depends(get_current_user)):
     doc = await db.squads.find_one({"id": squad_id})
     if not doc:
         raise HTTPException(status_code=404, detail="Squad not found")
     update_fields = {
         "players": [p.model_dump() for p in payload.players],
-        "updated_at": datetime.now(timezone.utc).isoformat(),
+        "updated_at": now_iso(),
     }
     if payload.group_photo is not None:
         update_fields["group_photo"] = payload.group_photo
+    if user.get("role") != "admin":
+        await create_pending_change(
+            "squad",
+            "update",
+            {"squad_id": squad_id, "group_photo": update_fields.get("group_photo"), "players": update_fields["players"]},
+            user,
+            f"Update {doc.get('age_group', '')} squad ({len(update_fields['players'])} players)",
+        )
+        return {"pending": True}
     await db.squads.update_one({"id": squad_id}, {"$set": update_fields})
     doc.update(update_fields)
     return SquadOut(**doc)
@@ -316,14 +404,17 @@ async def get_popup():
 
 
 @api_router.put("/admin/popup")
-async def update_popup(payload: PopupUpdate, admin: dict = Depends(get_current_admin)):
+async def update_popup(payload: PopupUpdate, user: dict = Depends(get_current_user)):
+    if user.get("role") != "admin":
+        await create_pending_change("popup", "update", payload.model_dump(), user, "Pop-up update")
+        return {"pending": True}
     doc = {
         "slot": "popup",
         "enabled": payload.enabled,
         "title": payload.title,
         "message": payload.message,
         "image_url": payload.image_url,
-        "updated_at": datetime.now(timezone.utc).isoformat(),
+        "updated_at": now_iso(),
     }
     await db.site_settings.update_one({"slot": "popup"}, {"$set": doc}, upsert=True)
     return {k: doc[k] for k in ("enabled", "title", "message", "image_url")}
@@ -441,21 +532,124 @@ async def get_content():
 
 
 @api_router.put("/admin/content")
-async def update_content(payload: SiteContentUpdate, admin: dict = Depends(get_current_admin)):
+async def update_content(payload: SiteContentUpdate, user: dict = Depends(get_current_user)):
     doc = payload.model_dump()
+    if user.get("role") != "admin":
+        await create_pending_change("content", "update", doc, user, "Homepage content update")
+        return {"pending": True}
     doc["slot"] = "content"
-    doc["updated_at"] = datetime.now(timezone.utc).isoformat()
+    doc["updated_at"] = now_iso()
     await db.site_settings.update_one({"slot": "content"}, {"$set": doc}, upsert=True)
     logger.info("Homepage content updated")
     return {k: v for k, v in doc.items() if k not in ("slot", "updated_at")}
 
 
-@api_router.delete("/admin/announcements/{announcement_id}", status_code=204)
-async def delete_announcement(announcement_id: str, admin: dict = Depends(get_current_admin)):
-    result = await db.announcements.delete_one({"id": announcement_id})
-    if result.deleted_count == 0:
+@api_router.delete("/admin/announcements/{announcement_id}")
+async def delete_announcement(announcement_id: str, user: dict = Depends(get_current_user)):
+    doc = await db.announcements.find_one({"id": announcement_id})
+    if not doc:
         raise HTTPException(status_code=404, detail="Announcement not found")
+    if user.get("role") != "admin":
+        await create_pending_change(
+            "announcement",
+            "delete",
+            {"announcement_id": announcement_id},
+            user,
+            f"Delete notice #{doc.get('notice_no', 0)} — \"{doc.get('title', '')}\"",
+        )
+        return {"pending": True}
+    await db.announcements.delete_one({"id": announcement_id})
     return Response(status_code=204)
+
+
+# ---------------- Users & approvals (admin only) ----------------
+
+class UserCreate(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    email: str
+    password: str
+    role: str = "editor"
+
+
+@api_router.get("/admin/users")
+async def list_users(admin: dict = Depends(require_admin)):
+    docs = await db.users.find({}, {"password_hash": 0}).sort("created_at", 1).to_list(100)
+    return [
+        {"id": d.get("id", ""), "email": d.get("email", ""), "role": d.get("role", "editor"), "created_at": d.get("created_at", "")}
+        for d in docs
+    ]
+
+
+@api_router.post("/admin/users", status_code=201)
+async def create_user(payload: UserCreate, admin: dict = Depends(require_admin)):
+    email = payload.email.strip().lower()
+    role = payload.role if payload.role in ("admin", "editor") else "editor"
+    if "@" not in email or "." not in email:
+        raise HTTPException(status_code=400, detail="Enter a valid email address")
+    if len(payload.password) < 8:
+        raise HTTPException(status_code=400, detail="Password must be at least 8 characters")
+    if await db.users.find_one({"email": email}):
+        raise HTTPException(status_code=409, detail="A user with this email already exists")
+    await db.users.insert_one({
+        "id": str(uuid.uuid4()),
+        "email": email,
+        "password_hash": hash_password(payload.password),
+        "role": role,
+        "created_at": now_iso(),
+    })
+    logger.info(f"User created: {email} ({role}) by {admin['email']}")
+    return {"id": "", "email": email, "role": role, "created_at": now_iso()}
+
+
+@api_router.delete("/admin/users/{user_id}", status_code=204)
+async def delete_user(user_id: str, admin: dict = Depends(require_admin)):
+    target = await db.users.find_one({"id": user_id})
+    if not target:
+        raise HTTPException(status_code=404, detail="User not found")
+    if target["id"] == admin["id"]:
+        raise HTTPException(status_code=400, detail="You cannot delete your own account")
+    if target.get("role") == "admin" and await db.users.count_documents({"role": "admin"}) <= 1:
+        raise HTTPException(status_code=400, detail="The last admin cannot be removed")
+    await db.users.delete_one({"id": user_id})
+    return Response(status_code=204)
+
+
+@api_router.get("/admin/pending")
+async def list_pending(admin: dict = Depends(require_admin)):
+    docs = await db.pending_changes.find({"status": "pending"}).sort("created_at", -1).to_list(200)
+    return [
+        {
+            "id": d["id"],
+            "resource": d.get("resource", ""),
+            "action": d.get("action", ""),
+            "summary": d.get("summary", ""),
+            "payload": d.get("payload", {}),
+            "proposed_by": d.get("proposed_by", ""),
+            "created_at": d.get("created_at", ""),
+        }
+        for d in docs
+    ]
+
+
+@api_router.post("/admin/pending/{change_id}/approve")
+async def approve_change(change_id: str, admin: dict = Depends(require_admin)):
+    change = await db.pending_changes.find_one({"id": change_id})
+    if not change:
+        raise HTTPException(status_code=404, detail="Change not found")
+    await apply_pending_change(change)
+    await db.pending_changes.delete_one({"id": change_id})
+    logger.info(f"Approved ({change.get('resource')}.{change.get('action')}): {change.get('summary')} — by {admin['email']}")
+    return {"ok": True}
+
+
+@api_router.post("/admin/pending/{change_id}/reject")
+async def reject_change(change_id: str, admin: dict = Depends(require_admin)):
+    result = await db.pending_changes.delete_one({"id": change_id})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Change not found")
+    logger.info(f"Rejected a pending change — by {admin['email']}")
+    return {"ok": True}
 
 
 # ---------------- Auth endpoints ----------------
@@ -516,20 +710,20 @@ async def refresh(request: Request, response: Response):
 
 
 @api_router.get("/auth/me")
-async def me(admin: dict = Depends(get_current_admin)):
+async def me(admin: dict = Depends(get_current_user)):
     return admin
 
 
 # ---------------- Admin endpoints ----------------
 
 @api_router.get("/admin/registrations", response_model=List[Registration])
-async def list_registrations(admin: dict = Depends(get_current_admin)):
+async def list_registrations(admin: dict = Depends(get_current_user)):
     docs = await db.registrations.find().sort("created_at", -1).to_list(2000)
     return [Registration(**d) for d in docs]
 
 
 @api_router.get("/admin/messages", response_model=List[ContactMessage])
-async def list_messages(admin: dict = Depends(get_current_admin)):
+async def list_messages(admin: dict = Depends(get_current_user)):
     docs = await db.contact_messages.find().sort("created_at", -1).to_list(2000)
     return [ContactMessage(**d) for d in docs]
 

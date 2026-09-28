@@ -40,8 +40,19 @@ Note: login response returns user object only; cookies carry the tokens. Bearer 
 - DELETE /api/admin/announcements/{id}
 - PUT /api/admin/squads/{id} (group_photo, players[])
 
-## Public announcements
-- GET /api/announcements
+## Users & roles (admin only)
+- POST /api/admin/users (email, password min 8, role: admin|editor)
+- GET /api/admin/users
+- DELETE /api/admin/users/{id} (cannot delete self; cannot remove last admin)
+
+## Approval workflow
+- Editors (role=editor) can view everything but their writes create PENDING changes:
+  - POST /api/admin/announcements -> {"pending": true} (create)
+  - DELETE /api/admin/announcements/{id} -> {"pending": true}
+  - POST /api/admin/announcements/{id}/pin -> {"pending": true}
+  - PUT /api/admin/squads/{id}, /api/admin/popup, /api/admin/content -> {"pending": true}
+- Admin-only: GET /api/admin/pending, POST /api/admin/pending/{id}/approve (applies change live), POST /api/admin/pending/{id}/reject (discards)
+- Editors get 403 on /api/admin/users and /api/admin/pending
 
 ## Brute force
 5 failed logins on the same ip:email -> 429 for 15 minutes.
