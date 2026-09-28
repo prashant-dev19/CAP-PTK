@@ -94,6 +94,21 @@ export default function Footer() {
           </a>
         </div>
       </div>
+
+      <div className="border-t border-ivory/5 relative z-10 bg-pavilion-deep" data-testid="footer-credit">
+        <div className="max-w-7xl mx-auto px-6 md:px-12 py-4 text-center text-[0.6rem] tracking-[0.2em] uppercase text-ivory/30">
+          Designed by{" "}
+          <a
+            href="https://www.iravatisolutions.com"
+            target="_blank"
+            rel="noreferrer noopener"
+            data-testid="footer-credit-link"
+            className="text-gold/60 hover:text-gold transition-colors"
+          >
+            Iravati Solutions
+          </a>
+        </div>
+      </div>
     </footer>
   );
 }
