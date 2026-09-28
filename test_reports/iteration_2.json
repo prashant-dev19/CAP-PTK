@@ -1,0 +1,59 @@
+{
+  "summary": "E2E browser verification of the security hardening package (login+2FA, password change, activity log, logout-everywhere, honeypot, headers) plus regressions (registrations, contact, pagination, admin tabs). All 7 target flows work. Discovered ONE minor UI regression: 2FA status badge in Security tab is stale immediately after a fresh 2FA sign-in — a reload fixes it.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {
+        "endpoint": "POST /api/auth/login and POST /api/auth/login/2fa",
+        "issue": "Response payloads omit `totp_enabled`. /auth/me returns it (line 145) but the two login endpoints return only {id,email,role} (server.py lines 838, 879). Frontend SecurityTab reads user.totp_enabled to render the Enabled/Not-enabled badge and the setup-vs-disable form → wrong state until a page reload."
+      }
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {
+        "component": "SecurityTab · TwoFactorCard",
+        "issue": "After a successful password+TOTP login the badge shows 'Not enabled' and the 'Set up 2FA' button appears, even though 2FA is active on the server. Reload resolves it. Root cause: /auth/login/2fa response is missing totp_enabled (see backend minor issue). Also — if the user clicks 'Set up 2FA' from this stale state, the backend correctly rejects with 400 'already enabled'.",
+        "selector": "[data-testid=\"2fa-status\"]",
+        "priority": "LOW"
+      }
+    ],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "verified_flows": {
+    "admin_login_password_only": "PASS — admin@capathankot.in / CAPadmin#2026 signs in, dashboard loads.",
+    "2fa_enrollment": "PASS — Security tab → Set up 2FA → QR + secret rendered, wrong 6-digit code rejected with friendly error, correct pyotp code flips badge to Enabled.",
+    "2fa_login": "PASS — after enabling, login prompts for 6-digit code (admin-login-2fa-code testid), wrong code rejected with 'That code didn't match. Check your authenticator app and try again.', valid TOTP signs in.",
+    "2fa_disable": "PASS — wrong password on disable returns error; correct password flips badge to Not enabled.",
+    "password_change": "PASS — wrong current password ('Your current password is incorrect'), mismatched confirm ('The new passwords don't match'), valid change → success message + other-session revocation (current session preserved).",
+    "activity_log_admin": "PASS — admin sees activity-table with 13 rows spanning wrong-password, 2FA enable, 2FA disable, password_changed, logged_out_everywhere events.",
+    "activity_log_editor": "PASS — editor does NOT see security-activity-card component and direct GET /api/admin/login-events returns 403.",
+    "logout_everywhere": "PASS — button confirms via window.confirm, POST /auth/logout-all bumps token_version, page redirects to login, subsequent GET /auth/me returns 401.",
+    "public_registration_form": "PASS — TEST_regression_user submitted, appeared in admin Registrations tab (stat card went from 3 → 4).",
+    "contact_form": "PASS — TEST_regression_contact submitted, visible in admin Messages tab.",
+    "honeypot": "PASS — POST /api/contact with website field populated returns 201 (fake-success) but nothing stored (verified via pymongo count).",
+    "notices_pagination_regression": "PASS — /notices shows 'Showing 1–8 of 8 notices' with pinned #01 first; pagination Prev/Next controls hidden by design when pages<=1 (matches iteration_1 note).",
+    "admin_tabs_regression": "PASS — Registrations/Messages/Announcements/Squads/Pop-up/Homepage/Security/Approvals/Users all render with zero pageerrors."
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_announcements_pagination.py"
+  ],
+  "action_items": [
+    "Minor: Add `totp_enabled` (and any other user fields SecurityTab reads) to the JSON returned by POST /api/auth/login and POST /api/auth/login/2fa, or have SecurityTab re-fetch /auth/me after mount. Also consider having /auth/2fa/activate/disable return the updated user so state stays authoritative."
+  ],
+  "critical_code_review_comments": [
+    "server.py: /auth/login and /auth/login/2fa hand-craft the user response and drift from /auth/me — extract a shared serialize_user(user) helper so all three endpoints return the same shape (id, email, role, totp_enabled).",
+    "Register.jsx / Contact.jsx: honeypot is `class=hidden` — good — but for stronger bot resistance consider also `tabindex=-1 autocomplete=off aria-hidden=true` on the input.",
+    "SecurityTab TwoFactorCard initialises enabled=!!user?.totp_enabled once and only ever mutates it via activate/disable success; if user prop updates (e.g. after refresh) the local state won't sync. A `useEffect(()=>setEnabled(!!user?.totp_enabled),[user?.totp_enabled])` would keep them in step.",
+    "server.py /admin/login-events has no pagination or size cap — could grow unbounded and dump the whole collection to admins. Consider `.limit(200)` + `sort({created_at:-1})`."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "100%", "frontend": "95% (1 minor stale-state UI bug)"},
+  "test_credentials": "admin@capathankot.in / CAPadmin#2026 · editor@capathankot.in / Editor@123 — restored & verified working post-test.",
+  "seed_data_creation": "None left. During test: 1 TEST_regression_user registration + 1 TEST_regression_contact message + 1 honeypot POST (not stored) — the two real submissions were deleted via pymongo cleanup. 2FA disabled at end. admin password restored to CAPadmin#2026. login_attempts collection cleared to prevent lockout residue.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Everything is in the original clean state: 3 real registrations, 2 real contact messages, 8 real notices (pinned District Trials first), admin 2FA disabled, admin password CAPadmin#2026, editor Editor@123. token_version has been bumped a few times by the change-password/logout-all flow — this is expected and does not affect cred validity. The only outstanding item is the minor stale-badge UI issue on the Security tab immediately after a 2FA-enabled login.",
+  "rca of the issue": "SecurityTab reads user.totp_enabled from the prop passed by <Admin/>. That prop is set from the /auth/login (or /auth/login/2fa) response, which returns only {id,email,role} while /auth/me returns totp_enabled too. Consequence: right after a fresh 2FA login, the state object in the parent is missing totp_enabled, so `enabled = !!user?.totp_enabled` is false and the badge/CTA render as if 2FA were off. A reload triggers /auth/me and the state becomes correct. Fix path: (a) include totp_enabled in the two login response payloads OR (b) call /auth/me right after onSuccess to backfill the user object OR (c) sync SecurityTab local enabled state via useEffect on user.totp_enabled."
+}

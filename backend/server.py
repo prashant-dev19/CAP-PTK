@@ -138,12 +138,7 @@ async def get_current_user(request: Request) -> dict:
         raise HTTPException(status_code=401, detail="User not found")
     if payload.get("ver", 0) != user.get("token_version", 0):
         raise HTTPException(status_code=401, detail="Session revoked — please sign in again")
-    return {
-        "id": user["id"],
-        "email": user["email"],
-        "role": user.get("role", "editor"),
-        "totp_enabled": bool(user.get("totp_enabled")),
-    }
+    return serialize_user(user)
 
 
 async def require_admin(user: dict = Depends(get_current_user)) -> dict:
@@ -153,6 +148,15 @@ async def require_admin(user: dict = Depends(get_current_user)) -> dict:
 
 
 # ---------------- Security helpers ----------------
+
+def serialize_user(user: dict) -> dict:
+    return {
+        "id": user["id"],
+        "email": user["email"],
+        "role": user.get("role", "editor"),
+        "totp_enabled": bool(user.get("totp_enabled")),
+    }
+
 
 def client_ip(request: Request) -> str:
     xff = request.headers.get("x-forwarded-for", "")
@@ -177,6 +181,9 @@ async def log_login_event(email: str, ip: str, success: bool, reason: str):
         "reason": reason,
         "created_at": now_iso(),
     })
+    # keep only the last 30 days of activity
+    cutoff = (datetime.now(timezone.utc) - timedelta(days=30)).isoformat()
+    await db.login_events.delete_many({"created_at": {"$lt": cutoff}})
 
 
 # Wrong passwords per (IP + email): count reaches tier → account locked that long
@@ -835,7 +842,7 @@ async def login(request: Request, response: Response, payload: LoginRequest):
     refresh_token = create_refresh_token(user)
     response.set_cookie(key="access_token", value=access_token, httponly=True, secure=True, samesite="none", max_age=900, path="/")
     response.set_cookie(key="refresh_token", value=refresh_token, httponly=True, secure=True, samesite="none", max_age=604800, path="/")
-    return {"id": user["id"], "email": user["email"], "role": user.get("role", "admin")}
+    return serialize_user(user)
 
 
 class TwoFactorLogin(BaseModel):
@@ -876,7 +883,7 @@ async def login_2fa(request: Request, response: Response, payload: TwoFactorLogi
     refresh_token = create_refresh_token(user)
     response.set_cookie(key="access_token", value=access_token, httponly=True, secure=True, samesite="none", max_age=900, path="/")
     response.set_cookie(key="refresh_token", value=refresh_token, httponly=True, secure=True, samesite="none", max_age=604800, path="/")
-    return {"id": user["id"], "email": user["email"], "role": user.get("role", "editor")}
+    return serialize_user(user)
 
 
 class TwoFactorActivate(BaseModel):

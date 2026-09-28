@@ -150,6 +150,10 @@ function TwoFactorCard({ user }) {
   const [error, setError] = useState("");
   const [done, setDone] = useState("");
 
+  useEffect(() => {
+    setEnabled(!!user?.totp_enabled);
+  }, [user?.totp_enabled]);
+
   const startSetup = async () => {
     setBusy(true);
     setError("");
