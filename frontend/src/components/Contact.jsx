@@ -8,7 +8,7 @@ const SUBJECTS = ["General Enquiry", "Trials & Selection", "Registration Help", 
 
 export default function Contact() {
   const c = useSiteContent();
-  const [form, setForm] = useState({ name: "", email: "", phone: "", subject: "", message: "" });
+  const [form, setForm] = useState({ name: "", email: "", phone: "", subject: "", message: "", website: "" });
   const [busy, setBusy] = useState(false);
   const [done, setDone] = useState(false);
   const [error, setError] = useState("");
@@ -103,6 +103,18 @@ export default function Contact() {
                 data-testid="contact-form"
                 className="border border-gold/15 bg-pavilion-mid/40 rounded-xl p-8 md:p-12"
               >
+                {/* Honeypot: hidden from humans, filled by spam bots */}
+                <input
+                  type="text"
+                  name="website"
+                  tabIndex={-1}
+                  autoComplete="off"
+                  aria-hidden="true"
+                  className="hidden"
+                  data-testid="contact-honeypot"
+                  value={form.website}
+                  onChange={set("website")}
+                />
                 <div className="grid sm:grid-cols-2 gap-x-8 gap-y-8">
                   <label className="block">
                     <span className="field-label">Name *</span>

@@ -4,6 +4,7 @@ import { WhatsAppIcon } from "@/components/icons";
 import { NoticeModal, Pagination, padNo } from "@/components/NoticesList";
 import ApprovalsTab from "@/components/admin/ApprovalsTab";
 import UsersTab from "@/components/admin/UsersTab";
+import SecurityTab from "@/components/admin/SecurityTab";
 import { api, formatApiError } from "@/lib/api";
 import { LogoMark } from "@/components/Logo";
 
@@ -20,6 +21,8 @@ function LoginCard({ onSuccess }) {
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [ticket, setTicket] = useState("");
+  const [code, setCode] = useState("");
 
   const submit = async (e) => {
     e.preventDefault();
@@ -27,6 +30,26 @@ function LoginCard({ onSuccess }) {
     setError("");
     try {
       const { data } = await api.post("/auth/login", { email, password });
+      if (data?.two_factor) {
+        setTicket(data.ticket);
+        setCode("");
+        setError("");
+      } else {
+        onSuccess(data);
+      }
+    } catch (err) {
+      setError(formatApiError(err));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const submitTwoFactor = async (e) => {
+    e.preventDefault();
+    setBusy(true);
+    setError("");
+    try {
+      const { data } = await api.post("/auth/login/2fa", { ticket, code });
       onSuccess(data);
     } catch (err) {
       setError(formatApiError(err));
@@ -38,7 +61,7 @@ function LoginCard({ onSuccess }) {
   return (
     <div className="min-h-screen flex items-center justify-center px-6 bg-[#081711] font-body" data-testid="admin-login-page">
       <form
-        onSubmit={submit}
+        onSubmit={ticket ? submitTwoFactor : submit}
         data-testid="admin-login-form"
         className="w-full max-w-md border border-gold/15 bg-pavilion-mid/60 rounded-2xl p-10"
       >
@@ -52,32 +75,54 @@ function LoginCard({ onSuccess }) {
           </div>
         </div>
 
-        <label className="block mb-6">
-          <span className="field-label">Email</span>
-          <input
-            type="email"
-            required
-            className="field"
-            data-testid="admin-login-email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            placeholder="admin email"
-            autoComplete="email"
-          />
-        </label>
-        <label className="block">
-          <span className="field-label">Password</span>
-          <input
-            type="password"
-            required
-            className="field"
-            data-testid="admin-login-password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            placeholder="password"
-            autoComplete="current-password"
-          />
-        </label>
+        {ticket ? (
+          <label className="block mb-6">
+            <span className="field-label">Two-factor code</span>
+            <input
+              className="field tracking-[0.4em] text-center text-xl"
+              required
+              inputMode="numeric"
+              data-testid="admin-login-2fa-code"
+              value={code}
+              onChange={(e) => setCode(e.target.value)}
+              placeholder="000000"
+              maxLength={7}
+              autoComplete="one-time-code"
+            />
+            <span className="block text-[0.62rem] text-ivory/40 mt-2">
+              Open the authenticator app on your phone and enter the current 6-digit code.
+            </span>
+          </label>
+        ) : (
+          <>
+            <label className="block mb-6">
+              <span className="field-label">Email</span>
+              <input
+                type="email"
+                required
+                className="field"
+                data-testid="admin-login-email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="admin email"
+                autoComplete="email"
+              />
+            </label>
+            <label className="block">
+              <span className="field-label">Password</span>
+              <input
+                type="password"
+                required
+                className="field"
+                data-testid="admin-login-password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="password"
+                autoComplete="current-password"
+              />
+            </label>
+          </>
+        )}
 
         {error && (
           <p className="text-sm text-red-300 mt-4" data-testid="admin-login-error">
@@ -97,7 +142,7 @@ function LoginCard({ onSuccess }) {
             </>
           ) : (
             <>
-              <Lock size={14} /> Sign in
+              <Lock size={14} /> {ticket ? "Verify code" : "Sign in"}
             </>
           )}
         </button>
@@ -800,6 +845,7 @@ function Dashboard({ user, onLogout }) {
               { id: "squads", label: "Squads" },
               { id: "popup", label: "Pop-up" },
               { id: "homepage", label: "Homepage" },
+              { id: "security", label: "Security" },
               ...(user?.role === "admin"
                 ? [
                     { id: "approvals", label: "Approvals" },
@@ -1055,6 +1101,8 @@ function Dashboard({ user, onLogout }) {
               <NoticeModal notice={selectedAnn} onClose={() => setSelectedAnn(null)} />
             </div>
           </div>
+        ) : tab === "security" ? (
+          <SecurityTab user={user} onLogout={onLogout} />
         ) : tab === "popup" ? (
           <div className="max-w-2xl">
             <PopupEditor />

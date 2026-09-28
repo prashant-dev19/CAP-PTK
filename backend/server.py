@@ -3,10 +3,12 @@ from dotenv import load_dotenv
 load_dotenv()
 
 import os
+import re
 import uuid
 import logging
 import bcrypt
 import jwt
+import pyotp
 from datetime import datetime, timezone, timedelta
 from typing import Optional, List
 
@@ -47,6 +49,7 @@ class RegistrationCreate(BaseModel):
     residence: str = Field(min_length=2, max_length=200)
     club_or_institute: Optional[str] = ""
     playing_experience: Optional[str] = ""
+    website: str = Field(default="", max_length=200)  # honeypot — humans leave it empty
 
 
 class Registration(RegistrationCreate):
@@ -63,6 +66,7 @@ class ContactCreate(BaseModel):
     phone: Optional[str] = ""
     subject: str = Field(min_length=2, max_length=160)
     message: str = Field(min_length=5, max_length=4000)
+    website: str = Field(default="", max_length=200)  # honeypot — humans leave it empty
 
 
 class ContactMessage(ContactCreate):
@@ -97,6 +101,7 @@ def create_access_token(user: dict) -> str:
         "sub": user["id"],
         "email": user["email"],
         "type": "access",
+        "ver": user.get("token_version", 0),
         "exp": datetime.now(timezone.utc) + timedelta(minutes=15),
     }
     return jwt.encode(payload, get_jwt_secret(), algorithm=JWT_ALGORITHM)
@@ -106,6 +111,7 @@ def create_refresh_token(user: dict) -> str:
     payload = {
         "sub": user["id"],
         "type": "refresh",
+        "ver": user.get("token_version", 0),
         "exp": datetime.now(timezone.utc) + timedelta(days=7),
     }
     return jwt.encode(payload, get_jwt_secret(), algorithm=JWT_ALGORITHM)
@@ -130,13 +136,114 @@ async def get_current_user(request: Request) -> dict:
     user = await db.users.find_one({"id": payload["sub"]})
     if not user:
         raise HTTPException(status_code=401, detail="User not found")
-    return {"id": user["id"], "email": user["email"], "role": user.get("role", "editor")}
+    if payload.get("ver", 0) != user.get("token_version", 0):
+        raise HTTPException(status_code=401, detail="Session revoked — please sign in again")
+    return {
+        "id": user["id"],
+        "email": user["email"],
+        "role": user.get("role", "editor"),
+        "totp_enabled": bool(user.get("totp_enabled")),
+    }
 
 
 async def require_admin(user: dict = Depends(get_current_user)) -> dict:
     if user.get("role", "editor") != "admin":
         raise HTTPException(status_code=403, detail="Admin role required")
     return user
+
+
+# ---------------- Security helpers ----------------
+
+def client_ip(request: Request) -> str:
+    xff = request.headers.get("x-forwarded-for", "")
+    if xff:
+        return xff.split(",")[0].strip()
+    return request.client.host if request.client else "unknown"
+
+
+def _parse_iso(ts: str):
+    try:
+        return datetime.fromisoformat(ts)
+    except Exception:
+        return None
+
+
+async def log_login_event(email: str, ip: str, success: bool, reason: str):
+    await db.login_events.insert_one({
+        "id": str(uuid.uuid4()),
+        "email": email,
+        "ip": ip,
+        "success": success,
+        "reason": reason,
+        "created_at": now_iso(),
+    })
+
+
+# Wrong passwords per (IP + email): count reaches tier → account locked that long
+EMAIL_LOCK_TIERS = [(5, 15), (10, 30), (15, 60)]
+# Wrong passwords per IP across ANY email: protects against spraying many accounts
+IP_LOCK_TIERS = [(20, 30), (30, 60)]
+
+
+async def check_login_lockout(ip: str, email: str):
+    now = datetime.now(timezone.utc)
+    for identifier in (f"email:{ip}:{email}", f"ip:{ip}"):
+        doc = await db.login_attempts.find_one({"identifier": identifier})
+        locked_until = _parse_iso((doc or {}).get("locked_until", ""))
+        if locked_until and now < locked_until:
+            mins = max(1, int((locked_until - now).total_seconds() // 60) + 1)
+            raise HTTPException(
+                status_code=429,
+                detail=f"Too many failed attempts. Locked — try again in about {mins} minutes.",
+            )
+
+
+async def record_failed_login(ip: str, email: str):
+    now = datetime.now(timezone.utc)
+    for identifier, tiers in ((f"email:{ip}:{email}", EMAIL_LOCK_TIERS), (f"ip:{ip}", IP_LOCK_TIERS)):
+        doc = await db.login_attempts.find_one({"identifier": identifier})
+        count = (doc or {}).get("count", 0) + 1
+        update: dict = {"$set": {"count": count, "updated_at": now.isoformat()}}
+        minutes = 0
+        for threshold, lock_minutes in tiers:
+            if count >= threshold:
+                minutes = lock_minutes
+        if minutes:
+            update["$set"]["locked_until"] = (now + timedelta(minutes=minutes)).isoformat()
+        await db.login_attempts.update_one({"identifier": identifier}, update, upsert=True)
+
+
+async def clear_failed_logins(ip: str, email: str):
+    await db.login_attempts.delete_one({"identifier": f"email:{ip}:{email}"})
+    await db.login_attempts.update_one(
+        {"identifier": f"ip:{ip}", "count": {"$gt": 0}}, {"$inc": {"count": -1}}
+    )
+
+
+# Public forms: max submissions per hour per IP
+FORM_LIMITS = {"registrations": 5, "contact": 5}
+
+
+async def check_form_rate(request: Request, kind: str):
+    ip = client_ip(request)
+    identifier = f"form:{kind}:{ip}"
+    now = datetime.now(timezone.utc)
+    doc = await db.login_attempts.find_one({"identifier": identifier})
+    updated = _parse_iso((doc or {}).get("updated_at", ""))
+    fresh = bool(updated) and (now - updated).total_seconds() < 3600
+    if fresh and (doc or {}).get("count", 0) >= FORM_LIMITS[kind]:
+        raise HTTPException(
+            status_code=429,
+            detail="Too many submissions from this connection. Please try again later.",
+        )
+    if fresh:
+        await db.login_attempts.update_one(
+            {"identifier": identifier}, {"$inc": {"count": 1}, "$set": {"updated_at": now.isoformat()}}
+        )
+    else:
+        await db.login_attempts.update_one(
+            {"identifier": identifier}, {"$set": {"count": 1, "updated_at": now.isoformat()}}, upsert=True
+        )
 
 
 # ---------------- Public endpoints ----------------
@@ -147,9 +254,15 @@ async def root():
 
 
 @api_router.post("/registrations", response_model=Registration, status_code=201)
-async def create_registration(payload: RegistrationCreate):
-    reg = Registration(**payload.model_dump())
+async def create_registration(payload: RegistrationCreate, request: Request):
+    await check_form_rate(request, "registrations")
+    data = payload.model_dump()
+    if data.pop("website", "").strip():
+        logger.info(f"Honeypot triggered on registration form ({client_ip(request)})")
+        return Registration(**payload.model_dump())
+    reg = Registration(**data)
     doc = reg.model_dump()
+    doc.pop("website", None)
     doc["created_at"] = doc["created_at"].isoformat()
     await db.registrations.insert_one(doc)
     logger.info(f"New player registration: {reg.full_name} ({reg.age_group})")
@@ -157,9 +270,15 @@ async def create_registration(payload: RegistrationCreate):
 
 
 @api_router.post("/contact", response_model=ContactMessage, status_code=201)
-async def create_contact(payload: ContactCreate):
-    msg = ContactMessage(**payload.model_dump())
+async def create_contact(payload: ContactCreate, request: Request):
+    await check_form_rate(request, "contact")
+    data = payload.model_dump()
+    if data.pop("website", "").strip():
+        logger.info(f"Honeypot triggered on contact form ({client_ip(request)})")
+        return ContactMessage(**payload.model_dump())
+    msg = ContactMessage(**data)
     doc = msg.model_dump()
+    doc.pop("website", None)
     doc["created_at"] = doc["created_at"].isoformat()
     await db.contact_messages.insert_one(doc)
     logger.info(f"New contact message from: {msg.name}")
@@ -691,29 +810,172 @@ async def reject_change(change_id: str, admin: dict = Depends(require_admin)):
 @api_router.post("/auth/login")
 async def login(request: Request, response: Response, payload: LoginRequest):
     email = payload.email.strip().lower()
-    identifier = f"{request.client.host if request.client else 'unknown'}:{email}"
+    ip = client_ip(request)
 
-    attempt = await db.login_attempts.find_one({"identifier": identifier})
-    if attempt and attempt.get("count", 0) >= 5 and datetime.now(timezone.utc) < attempt.get(
-        "locked_until", datetime.now(timezone.utc)
-    ):
-        raise HTTPException(status_code=429, detail="Too many failed attempts. Try again in 15 minutes.")
+    await check_login_lockout(ip, email)
 
     user = await db.users.find_one({"email": email})
     if not user or not verify_password(payload.password, user["password_hash"]):
-        update: dict = {"$inc": {"count": 1}, "$set": {"updated_at": datetime.now(timezone.utc).isoformat()}}
-        new_count = (attempt.get("count", 0) if attempt else 0) + 1
-        if new_count >= 5:
-            update["$set"]["locked_until"] = (datetime.now(timezone.utc) + timedelta(minutes=15)).isoformat()
-        await db.login_attempts.update_one({"identifier": identifier}, update, upsert=True)
+        await record_failed_login(ip, email)
+        await log_login_event(email, ip, False, "no_such_user" if not user else "wrong_password")
         raise HTTPException(status_code=401, detail="Invalid email or password")
 
-    await db.login_attempts.delete_one({"identifier": identifier})
+    if user.get("totp_enabled"):
+        ticket = jwt.encode(
+            {"sub": user["id"], "type": "2fa", "exp": datetime.now(timezone.utc) + timedelta(minutes=5)},
+            get_jwt_secret(),
+            algorithm=JWT_ALGORITHM,
+        )
+        await log_login_event(email, ip, False, "2fa_code_required")
+        return {"two_factor": True, "ticket": ticket}
+
+    await clear_failed_logins(ip, email)
+    await log_login_event(email, ip, True, "ok")
     access_token = create_access_token(user)
     refresh_token = create_refresh_token(user)
     response.set_cookie(key="access_token", value=access_token, httponly=True, secure=True, samesite="none", max_age=900, path="/")
     response.set_cookie(key="refresh_token", value=refresh_token, httponly=True, secure=True, samesite="none", max_age=604800, path="/")
     return {"id": user["id"], "email": user["email"], "role": user.get("role", "admin")}
+
+
+class TwoFactorLogin(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    ticket: str
+    code: str = Field(min_length=6, max_length=8)
+
+
+@api_router.post("/auth/login/2fa")
+async def login_2fa(request: Request, response: Response, payload: TwoFactorLogin):
+    ip = client_ip(request)
+    try:
+        tk = jwt.decode(payload.ticket, get_jwt_secret(), algorithms=[JWT_ALGORITHM])
+    except jwt.ExpiredSignatureError:
+        raise HTTPException(status_code=401, detail="This sign-in attempt expired — please sign in again")
+    except jwt.InvalidTokenError:
+        raise HTTPException(status_code=401, detail="Invalid sign-in attempt — please sign in again")
+    if tk.get("type") != "2fa":
+        raise HTTPException(status_code=401, detail="Invalid sign-in attempt — please sign in again")
+
+    user = await db.users.find_one({"id": tk["sub"]})
+    if not user or not user.get("totp_enabled"):
+        raise HTTPException(status_code=401, detail="Please sign in again")
+
+    email = user["email"]
+    await check_login_lockout(ip, email)
+
+    code = payload.code.strip().replace(" ", "")
+    if not user.get("totp_secret") or not pyotp.TOTP(user["totp_secret"]).verify(code, valid_window=1):
+        await record_failed_login(ip, email)
+        await log_login_event(email, ip, False, "2fa_code_invalid")
+        raise HTTPException(status_code=401, detail="That code didn't match. Check your authenticator app and try again.")
+
+    await clear_failed_logins(ip, email)
+    await log_login_event(email, ip, True, "ok")
+    access_token = create_access_token(user)
+    refresh_token = create_refresh_token(user)
+    response.set_cookie(key="access_token", value=access_token, httponly=True, secure=True, samesite="none", max_age=900, path="/")
+    response.set_cookie(key="refresh_token", value=refresh_token, httponly=True, secure=True, samesite="none", max_age=604800, path="/")
+    return {"id": user["id"], "email": user["email"], "role": user.get("role", "editor")}
+
+
+class TwoFactorActivate(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    code: str = Field(min_length=6, max_length=8)
+
+
+@api_router.post("/auth/2fa/setup")
+async def setup_2fa(request: Request, user: dict = Depends(get_current_user)):
+    doc = await db.users.find_one({"id": user["id"]})
+    if doc.get("totp_enabled"):
+        raise HTTPException(status_code=400, detail="Two-factor authentication is already enabled")
+    secret = pyotp.random_base32()
+    await db.users.update_one({"id": user["id"]}, {"$set": {"totp_secret": secret, "totp_enabled": False}})
+    uri = pyotp.totp.TOTP(secret).provisioning_uri(name=user["email"], issuer_name="CAP Pathankot")
+    return {"secret": secret, "otpauth_uri": uri}
+
+
+@api_router.post("/auth/2fa/activate")
+async def activate_2fa(payload: TwoFactorActivate, request: Request, user: dict = Depends(get_current_user)):
+    doc = await db.users.find_one({"id": user["id"]})
+    if doc.get("totp_enabled"):
+        raise HTTPException(status_code=400, detail="Two-factor authentication is already enabled")
+    if not doc.get("totp_secret"):
+        raise HTTPException(status_code=400, detail="Start the setup first")
+    if not pyotp.TOTP(doc["totp_secret"]).verify(payload.code.strip().replace(" ", ""), valid_window=1):
+        raise HTTPException(status_code=400, detail="That code didn't match — use the current code from your authenticator app")
+    await db.users.update_one({"id": user["id"]}, {"$set": {"totp_enabled": True}})
+    await log_login_event(user["email"], client_ip(request), True, "2fa_enabled")
+    return {"enabled": True}
+
+
+class PasswordConfirm(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    password: str
+
+
+@api_router.post("/auth/2fa/disable")
+async def disable_2fa(payload: PasswordConfirm, request: Request, user: dict = Depends(get_current_user)):
+    doc = await db.users.find_one({"id": user["id"]})
+    if not doc.get("totp_enabled"):
+        raise HTTPException(status_code=400, detail="Two-factor authentication is not enabled")
+    if not verify_password(payload.password, doc["password_hash"]):
+        await log_login_event(user["email"], client_ip(request), False, "2fa_disable_bad_password")
+        raise HTTPException(status_code=400, detail="Your password is incorrect")
+    await db.users.update_one({"id": user["id"]}, {"$set": {"totp_enabled": False, "totp_secret": ""}})
+    await log_login_event(user["email"], client_ip(request), True, "2fa_disabled")
+    return {"enabled": False}
+
+
+class PasswordChange(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    current_password: str
+    new_password: str = Field(min_length=10, max_length=128)
+
+
+def password_policy_error(pw: str) -> Optional[str]:
+    if not re.search(r"[A-Za-z]", pw):
+        return "include at least one letter"
+    if not re.search(r"\d", pw):
+        return "include at least one number"
+    return None
+
+
+@api_router.post("/auth/change-password")
+async def change_password(payload: PasswordChange, request: Request, response: Response, user: dict = Depends(get_current_user)):
+    doc = await db.users.find_one({"id": user["id"]})
+    if not doc or not verify_password(payload.current_password, doc["password_hash"]):
+        raise HTTPException(status_code=400, detail="Your current password is incorrect")
+    policy = password_policy_error(payload.new_password)
+    if policy:
+        raise HTTPException(status_code=400, detail=f"Weak password — use 10+ characters and {policy}")
+    if payload.new_password == payload.current_password:
+        raise HTTPException(status_code=400, detail="Choose a password you haven't used before")
+    new_version = doc.get("token_version", 0) + 1
+    await db.users.update_one(
+        {"id": user["id"]},
+        {"$set": {"password_hash": hash_password(payload.new_password), "token_version": new_version}},
+    )
+    doc["token_version"] = new_version
+    response.set_cookie(key="access_token", value=create_access_token(doc), httponly=True, secure=True, samesite="none", max_age=900, path="/")
+    response.set_cookie(key="refresh_token", value=create_refresh_token(doc), httponly=True, secure=True, samesite="none", max_age=604800, path="/")
+    await log_login_event(user["email"], client_ip(request), True, "password_changed")
+    return {"ok": True}
+
+
+@api_router.post("/auth/logout-all")
+async def logout_all(request: Request, response: Response, user: dict = Depends(get_current_user)):
+    doc = await db.users.find_one({"id": user["id"]})
+    await db.users.update_one(
+        {"id": user["id"]}, {"$set": {"token_version": (doc or {}).get("token_version", 0) + 1}}
+    )
+    response.delete_cookie(key="access_token", path="/")
+    response.delete_cookie(key="refresh_token", path="/")
+    await log_login_event(user["email"], client_ip(request), True, "logged_out_everywhere")
+    return {"ok": True}
 
 
 @api_router.post("/auth/logout")
@@ -739,6 +1001,8 @@ async def refresh(request: Request, response: Response):
     user = await db.users.find_one({"id": payload["sub"]})
     if not user:
         raise HTTPException(status_code=401, detail="User not found")
+    if payload.get("ver", 0) != user.get("token_version", 0):
+        raise HTTPException(status_code=401, detail="Session revoked — please sign in again")
     response.set_cookie(key="access_token", value=create_access_token(user), httponly=True, secure=True, samesite="none", max_age=900, path="/")
     return {"ok": True}
 
@@ -746,6 +1010,22 @@ async def refresh(request: Request, response: Response):
 @api_router.get("/auth/me")
 async def me(admin: dict = Depends(get_current_user)):
     return admin
+
+
+@api_router.get("/admin/login-events")
+async def list_login_events(admin: dict = Depends(require_admin)):
+    docs = await db.login_events.find().sort("created_at", -1).to_list(100)
+    return [
+        {
+            "id": d.get("id", ""),
+            "email": d.get("email", ""),
+            "ip": d.get("ip", ""),
+            "success": d.get("success", False),
+            "reason": d.get("reason", ""),
+            "created_at": d.get("created_at", ""),
+        }
+        for d in docs
+    ]
 
 
 # ---------------- Admin endpoints ----------------
@@ -773,26 +1053,35 @@ app.add_middleware(
 )
 
 
+@app.middleware("http")
+async def security_headers(request: Request, call_next):
+    response = await call_next(request)
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    return response
+
+
 @app.on_event("startup")
 async def startup():
     admin_email = os.environ.get("ADMIN_EMAIL", "admin@capathankot.in").strip().lower()
     admin_password = os.environ.get("ADMIN_PASSWORD", "admin123")
-    hashed = hash_password(admin_password)
+    # Seed the admin only when missing. The password can be changed inside the
+    # admin panel, so the stored hash is never overwritten from .env on restart.
     existing = await db.users.find_one({"email": admin_email})
     if existing is None:
         await db.users.insert_one({
             "id": str(uuid.uuid4()),
             "email": admin_email,
-            "password_hash": hashed,
+            "password_hash": hash_password(admin_password),
             "role": "admin",
+            "token_version": 0,
             "created_at": datetime.now(timezone.utc).isoformat(),
         })
         logger.info(f"Admin seeded: {admin_email}")
-    elif not verify_password(admin_password, existing["password_hash"]):
-        await db.users.update_one({"email": admin_email}, {"$set": {"password_hash": hashed}})
-        logger.info(f"Admin password updated from env: {admin_email}")
     await db.users.create_index("email", unique=True)
     await db.login_attempts.create_index("identifier")
+    await db.login_events.create_index("created_at")
 
     unnumbered = await db.announcements.find({"notice_no": {"$exists": False}}).sort("created_at", 1).to_list(1000)
     if unnumbered:

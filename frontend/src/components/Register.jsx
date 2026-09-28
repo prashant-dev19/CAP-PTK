@@ -17,6 +17,7 @@ const EMPTY = {
   residence: "",
   club_or_institute: "",
   playing_experience: "",
+  website: "", // honeypot — must stay empty; bots fill it
 };
 
 function Field({ label, required, className = "", children }) {
@@ -143,6 +144,18 @@ export default function Register() {
                 data-testid="registration-form"
                 className="border border-gold/15 bg-pavilion-mid/40 rounded-xl p-8 md:p-12"
               >
+                {/* Honeypot: hidden from humans, filled by spam bots */}
+                <input
+                  type="text"
+                  name="website"
+                  tabIndex={-1}
+                  autoComplete="off"
+                  aria-hidden="true"
+                  className="hidden"
+                  data-testid="register-honeypot"
+                  value={form.website}
+                  onChange={set("website")}
+                />
                 <div className="grid sm:grid-cols-2 gap-x-8 gap-y-8">
                   <Field label="Full name" required>
                     <input
