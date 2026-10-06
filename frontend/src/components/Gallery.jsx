@@ -1,9 +1,45 @@
+import { useState } from "react";
 import Reveal, { Eyebrow } from "@/components/Reveal";
 import { useSiteContent } from "@/context/SiteContent";
 
-const CAPTIONS = ["The appeal", "Timber", "Front foot", "Between the wickets", "In the nets", "The drive"];
+const CAPTIONS = [
+  "The home ground from above",
+  "Guidance at the trials",
+  "Match day in Pathankot",
+  "District cricket",
+  "District cricket",
+  "District cricket",
+];
 
 const SPANS = ["col-span-2 row-span-2", "", "", "col-span-2", "", ""];
+
+// With exactly three photos the two small ones stretch wide so the grid has no holes
+const spansFor = (count) =>
+  count === 3 ? ["col-span-2 row-span-2", "col-span-2", "col-span-2"] : SPANS;
+
+function GalleryItem({ src, caption, span }) {
+  // Portrait photos anchor to the top of their frame so faces stay in view
+  const [portrait, setPortrait] = useState(false);
+  return (
+    <figure
+      className={`relative overflow-hidden rounded-lg group ${span || ""}`}
+      data-testid="gallery-item"
+    >
+      <img
+        src={src}
+        alt={caption}
+        loading="lazy"
+        onLoad={(e) => setPortrait(e.currentTarget.naturalHeight > e.currentTarget.naturalWidth)}
+        className={`absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-105 ${
+          portrait ? "object-top" : "object-center"
+        }`}
+      />
+      <figcaption className="absolute bottom-0 inset-x-0 bg-gradient-to-t from-pavilion/90 via-pavilion/40 to-transparent px-4 pb-3 pt-8 text-[0.62rem] tracking-[0.22em] uppercase text-ivory/85 opacity-0 group-hover:opacity-100 transition-opacity duration-500">
+        {caption}
+      </figcaption>
+    </figure>
+  );
+}
 
 export default function Gallery() {
   const c = useSiteContent();
@@ -44,21 +80,12 @@ export default function Gallery() {
               data-testid="gallery-grid"
             >
               {urls.slice(0, 6).map((src, i) => (
-                <figure
+                <GalleryItem
                   key={src}
-                  className={`relative overflow-hidden rounded-lg group ${SPANS[i] || ""}`}
-                  data-testid="gallery-item"
-                >
-                  <img
-                    src={src}
-                    alt={CAPTIONS[i] || `District cricket ${i + 1}`}
-                    loading="lazy"
-                    className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
-                  />
-                  <figcaption className="absolute bottom-0 inset-x-0 bg-gradient-to-t from-pavilion/90 via-pavilion/40 to-transparent px-4 pb-3 pt-8 text-[0.62rem] tracking-[0.22em] uppercase text-ivory/85 opacity-0 group-hover:opacity-100 transition-opacity duration-500">
-                    {CAPTIONS[i] || `District cricket ${i + 1}`}
-                  </figcaption>
-                </figure>
+                  src={src}
+                  caption={CAPTIONS[i] || `District cricket ${i + 1}`}
+                  span={spansFor(urls.length)[i] || ""}
+                />
               ))}
             </div>
           </Reveal>
@@ -66,8 +93,8 @@ export default function Gallery() {
 
         <Reveal delay={0.15}>
           <p className="mt-8 text-xs text-ivory/40 tracking-wide">
-            Representative photographs of the district game. The Association's own match album will
-            follow.
+            From the Association's own albums — trials, match days and the home ground in
+            Pathankot.
           </p>
         </Reveal>
       </div>
