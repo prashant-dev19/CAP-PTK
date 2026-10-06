@@ -1,19 +1,13 @@
 import Logo from "@/components/Logo";
 import Reveal from "@/components/Reveal";
-import { useSiteContent } from "@/context/SiteContent";
-
-const LINKS = [
-  { label: "The Association", href: "/#about" },
-  { label: "Squads", href: "/squads" },
-  { label: "The Pathway", href: "/#pathway" },
-  { label: "Register", href: "/register" },
-  { label: "Contact", href: "/#contact" },
-];
+import { useSiteContent, DEFAULT_MENU, menuVisible } from "@/context/SiteContent";
 
 export default function Footer() {
   const c = useSiteContent();
   const bearers = (c.bearers || []).filter((b) => b.role || b.name);
   const tel = `tel:${c.contact_phone.replace(/[^+\d]/g, "")}`;
+  const menu = c.menu || DEFAULT_MENU;
+  const items = (menu.items || []).filter((i) => menuVisible(i, menu.pages || {}));
 
   return (
     <footer className="bg-pavilion-deep border-t border-gold/15 pt-20 md:pt-28 overflow-hidden" data-testid="footer">
@@ -42,17 +36,21 @@ export default function Footer() {
           <div className="md:col-span-3">
             <p className="text-gold/80 text-[0.6rem] tracking-[0.3em] uppercase mb-5">Explore</p>
             <ul className="space-y-3">
-              {LINKS.map((l) => (
-                <li key={l.href}>
-                  <a
-                    href={l.href}
-                    data-testid={`footer-link-${l.href.replace("/", "").replace("#", "") || "home"}`}
-                    className="text-sm text-ivory/60 hover:text-gold transition-colors"
-                  >
-                    {l.label}
-                  </a>
-                </li>
-              ))}
+              {items.map((item) => {
+                const external = /^https?:\/\//.test(item.url);
+                return (
+                  <li key={item.id}>
+                    <a
+                      href={item.url}
+                      {...(external ? { target: "_blank", rel: "noreferrer noopener" } : {})}
+                      data-testid={`footer-link-${item.id}`}
+                      className="text-sm text-ivory/60 hover:text-gold transition-colors"
+                    >
+                      {item.label}
+                    </a>
+                  </li>
+                );
+              })}
             </ul>
           </div>
 

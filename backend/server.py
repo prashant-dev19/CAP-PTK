@@ -16,7 +16,7 @@ from html import escape
 from html.parser import HTMLParser
 from urllib.parse import urlparse
 from datetime import datetime, timezone, timedelta
-from typing import Optional, List
+from typing import Optional, List, Dict
 
 from pydantic import BaseModel, Field, ConfigDict
 from fastapi import FastAPI, APIRouter, HTTPException, Request, Response, Depends, UploadFile, File
@@ -786,6 +786,9 @@ async def apply_pending_change(change: dict):
             if payload.get("group_photo") is not None:
                 fields["group_photo"] = payload["group_photo"]
             await db.squads.update_one({"id": payload["squad_id"]}, {"$set": fields})
+    elif resource == "menu":
+        doc = {**payload, "slot": "menu", "updated_at": now_iso()}
+        await db.site_settings.update_one({"slot": "menu"}, {"$set": doc}, upsert=True)
     elif resource == "announcement":
         if action == "create":
             last = await db.announcements.find_one(sort=[("notice_no", -1)])
@@ -831,6 +834,74 @@ async def update_squad(squad_id: str, payload: SquadUpdate, user: dict = Depends
     await db.squads.update_one({"id": squad_id}, {"$set": update_fields})
     doc.update(update_fields)
     return SquadOut(**doc)
+
+
+# ---------------- Menu & pages ----------------
+
+DEFAULT_MENU = {
+    "items": [
+        {"id": "about", "label": "The Association", "url": "/#about", "enabled": True},
+        {"id": "squads", "label": "Squads", "url": "/squads", "enabled": True},
+        {"id": "pathway", "label": "The Pathway", "url": "/#pathway", "enabled": True},
+        {"id": "contact", "label": "Contact", "url": "/#contact", "enabled": True},
+    ],
+    "show_register_cta": True,
+    "pages": {"squads": True, "notices": True, "register": True},
+}
+
+
+class MenuItemIn(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    label: str = Field(min_length=1, max_length=40)
+    url: str = Field(min_length=1, max_length=300)
+    enabled: bool = True
+
+
+class MenuUpdate(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    items: List[MenuItemIn] = Field(default_factory=list)
+    show_register_cta: bool = True
+    pages: Dict[str, bool] = Field(default_factory=dict)
+
+
+def _clean_menu(payload: MenuUpdate) -> dict:
+    items = []
+    for it in payload.items[:25]:
+        url = it.url.strip()
+        if not url:
+            continue
+        if not url.startswith(("/", "http://", "https://")):
+            url = f"https://{url}"
+        items.append({"id": str(uuid.uuid4()), "label": it.label.strip(), "url": url, "enabled": it.enabled})
+    pages_raw = payload.pages or {}
+    pages = {k: bool(pages_raw.get(k, True)) for k in ("squads", "notices", "register")}
+    return {"items": items, "show_register_cta": payload.show_register_cta, "pages": pages}
+
+
+@api_router.get("/menu")
+async def get_menu():
+    doc = await db.site_settings.find_one({"slot": "menu"})
+    if not doc:
+        return DEFAULT_MENU
+    return {
+        "items": doc.get("items") or DEFAULT_MENU["items"],
+        "show_register_cta": doc.get("show_register_cta", True),
+        "pages": {**DEFAULT_MENU["pages"], **(doc.get("pages") or {})},
+    }
+
+
+@api_router.put("/admin/menu")
+async def update_menu(payload: MenuUpdate, user: dict = Depends(get_current_user)):
+    cleaned = _clean_menu(payload)
+    if user.get("role") != "admin":
+        await create_pending_change("menu", "update", cleaned, user, "Menu & pages update")
+        return {"pending": True}
+    doc = {**cleaned, "slot": "menu", "updated_at": now_iso()}
+    await db.site_settings.update_one({"slot": "menu"}, {"$set": doc}, upsert=True)
+    logger.info("Menu & pages updated")
+    return {k: doc[k] for k in ("items", "show_register_cta", "pages")}
 
 
 # ---------------- Home pop-up ----------------

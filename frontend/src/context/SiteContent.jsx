@@ -60,19 +60,57 @@ export const DEFAULT_CONTENT = {
   ],
 };
 
+export const DEFAULT_MENU = {
+  items: [
+    { id: "about", label: "The Association", url: "/#about", enabled: true },
+    { id: "squads", label: "Squads", url: "/squads", enabled: true },
+    { id: "pathway", label: "The Pathway", url: "/#pathway", enabled: true },
+    { id: "contact", label: "Contact", url: "/#contact", enabled: true },
+  ],
+  show_register_cta: true,
+  pages: { squads: true, notices: true, register: true },
+};
+
+// Which switchable page (if any) a menu URL points at
+export const pageForUrl = (url) => {
+  const clean = (url || "").split("?")[0].split("#")[0].replace(/\/+$/, "");
+  if (clean === "/squads") return "squads";
+  if (clean === "/notices") return "notices";
+  if (clean === "/register") return "register";
+  return null;
+};
+
+// A menu item shows only when enabled AND its page isn't switched off
+export const menuVisible = (item, pages = {}) => {
+  if (!item?.enabled) return false;
+  const page = pageForUrl(item.url);
+  return !page || pages[page] !== false;
+};
+
 const SiteContentContext = createContext(DEFAULT_CONTENT);
 
 export function SiteContentProvider({ children }) {
   const [content, setContent] = useState(DEFAULT_CONTENT);
+  const [menu, setMenu] = useState(DEFAULT_MENU);
 
   useEffect(() => {
     api
       .get("/content")
       .then(({ data }) => setContent({ ...DEFAULT_CONTENT, ...(data || {}) }))
       .catch(() => {});
+    api
+      .get("/menu")
+      .then(({ data }) =>
+        setMenu({
+          items: data?.items?.length ? data.items : DEFAULT_MENU.items,
+          show_register_cta: data?.show_register_cta !== false,
+          pages: { ...DEFAULT_MENU.pages, ...(data?.pages || {}) },
+        })
+      )
+      .catch(() => {});
   }, []);
 
-  return <SiteContentContext.Provider value={content}>{children}</SiteContentContext.Provider>;
+  return <SiteContentContext.Provider value={{ ...content, menu }}>{children}</SiteContentContext.Provider>;
 }
 
 export const useSiteContent = () => useContext(SiteContentContext);

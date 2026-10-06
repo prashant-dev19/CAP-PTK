@@ -6,6 +6,7 @@ import ApprovalsTab from "@/components/admin/ApprovalsTab";
 import UsersTab from "@/components/admin/UsersTab";
 import SecurityTab from "@/components/admin/SecurityTab";
 import PhotoUpload from "@/components/admin/PhotoUpload";
+import MenuTab from "@/components/admin/MenuTab";
 import { api, formatApiError } from "@/lib/api";
 import { LogoMark } from "@/components/Logo";
 
@@ -841,6 +842,7 @@ function Dashboard({ user, onLogout }) {
               { id: "squads", label: "Squads" },
               { id: "popup", label: "Pop-up" },
               { id: "homepage", label: "Homepage" },
+              { id: "menu", label: "Menus" },
               { id: "security", label: "Security" },
               ...(user?.role === "admin"
                 ? [
@@ -1097,6 +1099,8 @@ function Dashboard({ user, onLogout }) {
               <NoticeModal notice={selectedAnn} onClose={() => setSelectedAnn(null)} />
             </div>
           </div>
+        ) : tab === "menu" ? (
+          <MenuTab />
         ) : tab === "security" ? (
           <SecurityTab user={user} onLogout={onLogout} />
         ) : tab === "popup" ? (

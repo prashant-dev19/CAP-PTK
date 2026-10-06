@@ -2,18 +2,16 @@ import { useEffect, useState } from "react";
 import { Menu, X, Megaphone, ArrowRight } from "lucide-react";
 import { api } from "@/lib/api";
 import Logo from "@/components/Logo";
-
-const LINKS = [
-  { label: "The Association", href: "/#about" },
-  { label: "Squads", href: "/squads" },
-  { label: "The Pathway", href: "/#pathway" },
-  { label: "Contact", href: "/#contact" },
-];
+import { useSiteContent, DEFAULT_MENU, menuVisible } from "@/context/SiteContent";
 
 export default function Navbar() {
   const [open, setOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const [notice, setNotice] = useState(null);
+  const c = useSiteContent();
+  const menu = c.menu || DEFAULT_MENU;
+  const items = (menu.items || []).filter((i) => menuVisible(i, menu.pages || {}));
+  const showCta = menu.show_register_cta !== false;
 
   useEffect(() => {
     api
@@ -64,23 +62,29 @@ export default function Navbar() {
             <Logo />
           </a>
           <nav className="hidden md:flex items-center gap-10">
-            {LINKS.map((l) => (
+            {items.map((item) => {
+              const external = /^https?:\/\//.test(item.url);
+              return (
+                <a
+                  key={item.id}
+                  href={item.url}
+                  {...(external ? { target: "_blank", rel: "noreferrer noopener" } : {})}
+                  data-testid={`nav-link-${item.id}`}
+                  className="link-underline text-[0.68rem] tracking-[0.25em] uppercase text-ivory/70 hover:text-gold transition-colors"
+                >
+                  {item.label}
+                </a>
+              );
+            })}
+            {showCta && (
               <a
-                key={l.href}
-                href={l.href}
-                data-testid={`nav-link-${l.href.slice(1)}`}
-                className="link-underline text-[0.68rem] tracking-[0.25em] uppercase text-ivory/70 hover:text-gold transition-colors"
+                href="/register"
+                data-testid="nav-register-cta"
+                className="btn-gold bg-gold text-pavilion text-[0.68rem] tracking-[0.25em] uppercase font-semibold px-6 py-3 rounded-full"
               >
-                {l.label}
+                Register
               </a>
-            ))}
-            <a
-              href="/register"
-              data-testid="nav-register-cta"
-              className="btn-gold bg-gold text-pavilion text-[0.68rem] tracking-[0.25em] uppercase font-semibold px-6 py-3 rounded-full"
-            >
-              Register
-            </a>
+            )}
           </nav>
           <button
             className="md:hidden text-ivory p-2"
@@ -97,24 +101,31 @@ export default function Navbar() {
       {open && (
         <div className="fixed inset-0 z-40 bg-pavilion/95 backdrop-blur-xl md:hidden" data-testid="nav-mobile-menu">
           <div className="pt-32 px-8 flex flex-col gap-7">
-            {LINKS.map((l) => (
+            {items.map((item) => {
+              const external = /^https?:\/\//.test(item.url);
+              return (
+                <a
+                  key={item.id}
+                  href={item.url}
+                  onClick={() => setOpen(false)}
+                  {...(external ? { target: "_blank", rel: "noreferrer noopener" } : {})}
+                  className="font-display text-4xl text-ivory hover:text-gold transition-colors"
+                  data-testid={`nav-mobile-${item.id}`}
+                >
+                  {item.label}
+                </a>
+              );
+            })}
+            {showCta && (
               <a
-                key={l.href}
-                href={l.href}
+                href="/register"
                 onClick={() => setOpen(false)}
-                className="font-display text-4xl text-ivory hover:text-gold transition-colors"
+                className="font-display text-4xl text-gold italic"
+                data-testid="nav-mobile-register"
               >
-                {l.label}
+                Register as a Player
               </a>
-            ))}
-            <a
-              href="/register"
-              onClick={() => setOpen(false)}
-              className="font-display text-4xl text-gold italic"
-              data-testid="nav-mobile-register"
-            >
-              Register as a Player
-            </a>
+            )}
           </div>
         </div>
       )}
