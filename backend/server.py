@@ -506,7 +506,7 @@ async def get_object(path: str) -> tuple[bytes, str]:
 async def upload_photo(request: Request, file: UploadFile = File(...), user: dict = Depends(get_current_user)):
     if (file.content_type or "") not in ALLOWED_IMAGE_TYPES:
         raise HTTPException(status_code=400, detail="Only JPG, PNG or WebP images are allowed")
-    data = await file.read()
+    data = await file.read(MAX_UPLOAD_BYTES + 1)  # incremental read — a huge body can't blow up the worker
     if len(data) > MAX_UPLOAD_BYTES:
         raise HTTPException(status_code=400, detail="Image is too large — keep it under 5 MB")
     ext = ALLOWED_IMAGE_TYPES[file.content_type]
@@ -660,7 +660,7 @@ async def create_announcement(payload: AnnouncementCreate, user: dict = Depends(
     return ann
 
 
-@api_router.post("/admin/announcements/{announcement_id}/pin", response_model=Announcement)
+@api_router.post("/admin/announcements/{announcement_id}/pin")
 async def toggle_pin_announcement(announcement_id: str, user: dict = Depends(get_current_user)):
     doc = await db.announcements.find_one({"id": announcement_id})
     if not doc:
@@ -808,7 +808,7 @@ async def apply_pending_change(change: dict):
             )
 
 
-@api_router.put("/admin/squads/{squad_id}", response_model=SquadOut)
+@api_router.put("/admin/squads/{squad_id}")
 async def update_squad(squad_id: str, payload: SquadUpdate, user: dict = Depends(get_current_user)):
     doc = await db.squads.find_one({"id": squad_id})
     if not doc:

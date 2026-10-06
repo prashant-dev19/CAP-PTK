@@ -1,0 +1,64 @@
+{
+  "summary": "Tested the Direct Photo Uploads feature (admin+editor squad group photos, home pop-up image). Backend: 11/11 pytest tests green covering auth gating, mime+size validation, upload→serve round-trip, editor upload, 404, plus admin tabs regression. Frontend: Admin upload→save→public /squads image visible (200 image/png, naturalWidth 1375) → remove→save→cleared verified end-to-end. Pop-up upload also round-trips to home page. All test data cleaned up (U-14 group_photo='', popup enabled=false, title/message restored, image_url=''). FOUND CRITICAL BUG: editor saving a squad returns HTTP 500 (ResponseValidationError) because PUT /api/admin/squads/{id} declares response_model=SquadOut but returns {'pending': True} for non-admin users. The pending change IS persisted (visible in Approvals) but the UI shows a red 'Something went wrong. Please try again.' instead of the expected 'Submitted — an admin must approve it' info message. Reject button in Approvals tab works and cleans up the pending entry.",
+  "backend_issues": {
+    "critical": [
+      {
+        "endpoint": "PUT /api/admin/squads/{squad_id}",
+        "issue": "response_model=SquadOut incompatible with {'pending': True} return for non-admin users -> FastAPI ResponseValidationError (500). Breaks the editor approval flow for squad saves (with OR without photos). Fix options: (a) remove response_model and return Dict/Union, (b) wrap return in Union[SquadOut, PendingResponse], (c) move the pending-change creation + response ordering so admin path returns SquadOut and non-admin returns a plain dict without the decorator-level validator. Note: popup PUT at line 855 likely has the same latent issue — please audit.",
+        "priority": "CRITICAL"
+      }
+    ],
+    "minor": [
+      {
+        "endpoint": "GET /api/files/{path}",
+        "issue": "Backend sets 'Cache-Control: public, max-age=86400' but the Cloudflare/K8s ingress overrides it to 'no-store, no-cache, must-revalidate'. Images still serve 200 image/*, but client-side caching is lost. Preview-env artefact — probably fine for prod but worth noting."
+      }
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {
+        "component": "SquadEditor (editor role)",
+        "issue": "After clicking 'Save squad' as editor, UI shows red 'Something went wrong. Please try again.' instead of the expected pending-queued info message. Root cause is the backend 500 above — fix the backend and this disappears.",
+        "selector": "button:has-text('Save squad') -> text 'Something went wrong'",
+        "priority": "HIGH"
+      }
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {
+        "screen": "Admin → Squads tab",
+        "issues": [
+          "Duplicate data-testid values across Men's and Women's wings: 'squad-photo-u19-input', 'squad-photo-u23-input', 'squad-photo-seniors-input' each appear twice (same for -upload / -remove / -preview / -progress). The slug used for testPrefix must include the wing to be unique (e.g. squad-photo-women-u19-input). Playwright will match the first; strict mode would fail. Low priority but a test-hygiene issue."
+        ]
+      }
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_photo_upload.py",
+    "/app/test_reports/pytest/photo_upload.xml"
+  ],
+  "action_items": [
+    "FIX BACKEND: PUT /api/admin/squads/{squad_id} — remove response_model=SquadOut OR change return type to Union so {'pending': True} validates for non-admin. Audit PUT /api/admin/popup for the same pattern.",
+    "FIX FRONTEND: PhotoUpload testPrefix for Women's Wing squads collides with Men's — include wing in the testid slug.",
+    "Optional: switch PhotoUpload progress-indicator / preview to use more robust testid structure that includes an <img> element so e2e tests can await a visible img.src — current preview uses background-image CSS which isn't matched by [data-testid$='preview'] img."
+  ],
+  "critical_code_review_comments": [
+    "server.py line 811 — @api_router.put('/admin/squads/{squad_id}', response_model=SquadOut) is incompatible with the non-admin pending-change path on line 830 (returns {'pending': True}). This has been broken since the approval workflow landed; FastAPI's response validation is strict.",
+    "Upload endpoint streams the entire file into memory before size-checking (await file.read()). A malicious client can send a 100MB multipart body and still OOM the worker before the 5MB check. Consider checking Content-Length header first OR using an incremental read with a byte counter.",
+    "db.files is written but never read for permission checks on GET /api/files/{path} — any logged-in path owner (uploaded_by) is lost; is_deleted soft-delete is defined but no admin endpoint exists to delete / list uploads. Not blocking, but means the storage will accumulate orphans whenever a squad photo is replaced or removed (old /api/files/... entries stay 'live')."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_photo_upload.py (new)"
+  ],
+  "success_rate": {
+    "backend": "100% on tested endpoints (11/11 pytest). Additional defect found via UI integration (editor squad PUT response validation).",
+    "frontend": "80% — admin squad+popup upload flows pass end-to-end; editor squad save flow fails due to backend bug."
+  },
+  "test_credentials": "Used admin@capathankot.in / CAPadmin#2026 and editor@capathankot.in / Editor@123 from /app/memory/test_credentials.md.",
+  "seed_data_creation": "No seed data created. All test uploads were removed: U-14 group_photo cleaned to '', pop-up disabled with image_url='' and original Welcome/Trials title/message restored. One editor-submitted squad pending change was rejected via Approvals tab. Two pre-existing editor notice pending changes left untouched (not created in this run).",
+  "retest_needed": true,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "If retesting after main agent fixes the squads PUT response_model issue: (1) login as editor, Squads tab, upload a PNG on any squad, click Save squad -> expect green info 'Submitted — an admin must approve it', no red error. (2) login as admin, Approvals tab -> new squad entry present with Group photo /api/files/... link. (3) Click Approve -> public /squads page shows the image. (4) Clean up: reject or re-save with empty photo. Also verify PUT /api/admin/popup under editor role once admin confirms the same response_model pattern isn't present there.",
+  "rca of the issue": "RCA — Editor squad save returns 500 'Something went wrong': File /app/backend/server.py, line 811 declares the endpoint with response_model=SquadOut (a Pydantic model requiring id, age_group, label fields). When user.role != 'admin', the handler at line 830 returns `{'pending': True}` — a dict missing all three required fields. FastAPI runs response serialization via that model and raises ResponseValidationError (3 validation errors: id/age_group/label missing), which the exception handler returns as HTTP 500. Reproduction: login as editor, PUT /api/admin/squads/<any-valid-id> with any body -> 500. Mitigation (minimal diff): change the decorator to `@api_router.put('/admin/squads/{squad_id}')` (drop response_model) OR declare `response_model=Union[SquadOut, Dict[str, bool]]` with `response_model_exclude_unset=True`. Side effect to be aware of: the pending-change document IS created before the handler returns, so a failed save still queues an Approval request — the DB write is NOT rolled back by the response validation error."
+}

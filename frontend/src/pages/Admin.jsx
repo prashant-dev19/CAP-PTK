@@ -503,7 +503,7 @@ function PopupEditor() {
 }
 
 function SquadEditor({ squad, onSaved }) {
-  const sid = squad.age_group.toLowerCase().replace("-", "");
+  const sid = `${(squad.wing || "Men").toLowerCase()}-${squad.age_group.toLowerCase().replace(/^u-/, "u")}`;
   const [photo, setPhoto] = useState(squad.group_photo || "");
   const [players, setPlayers] = useState(squad.players || []);
   const [busy, setBusy] = useState(false);
