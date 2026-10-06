@@ -19,7 +19,7 @@ from datetime import datetime, timezone, timedelta
 from typing import Optional, List
 
 from pydantic import BaseModel, Field, ConfigDict
-from fastapi import FastAPI, APIRouter, HTTPException, Request, Response, Depends
+from fastapi import FastAPI, APIRouter, HTTPException, Request, Response, Depends, UploadFile, File
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
 
@@ -448,6 +448,96 @@ def queue_email_alert(alert_coro):
             logger.error(f"Email alert failed: {e}")
 
     asyncio.create_task(_run())
+
+
+# ---------------- Object storage (Emergent-managed) — squad & pop-up photo uploads ----------------
+
+STORAGE_BASE = (os.environ.get("INTEGRATION_PROXY_URL") or "").strip() or "https://integrations.emergentagent.com"
+STORAGE_URL = STORAGE_BASE.rstrip("/") + "/objstore/api/v1/storage"
+STORAGE_APP = "capathankot"
+STORAGE_KEY_HOLDER = {"key": None}
+ALLOWED_IMAGE_TYPES = {"image/jpeg": "jpg", "image/png": "png", "image/webp": "webp"}
+MAX_UPLOAD_BYTES = 5 * 1024 * 1024
+
+
+async def init_storage(force: bool = False) -> str:
+    if STORAGE_KEY_HOLDER["key"] and not force:
+        return STORAGE_KEY_HOLDER["key"]
+    async with httpx.AsyncClient(timeout=30) as client:
+        resp = await client.post(
+            f"{STORAGE_URL}/init", json={"emergent_key": os.environ["EMERGENT_LLM_KEY"]}
+        )
+        resp.raise_for_status()
+    STORAGE_KEY_HOLDER["key"] = resp.json()["storage_key"]
+    return STORAGE_KEY_HOLDER["key"]
+
+
+async def put_object(path: str, data: bytes, content_type: str) -> dict:
+    key = await init_storage()
+    async with httpx.AsyncClient(timeout=120) as client:
+        resp = await client.put(
+            f"{STORAGE_URL}/objects/{path}",
+            headers={"X-Storage-Key": key, "Content-Type": content_type},
+            content=data,
+        )
+        if resp.status_code == 404:  # cached storage key went inactive — mint a new one once
+            key = await init_storage(force=True)
+            resp = await client.put(
+                f"{STORAGE_URL}/objects/{path}",
+                headers={"X-Storage-Key": key, "Content-Type": content_type},
+                content=data,
+            )
+        resp.raise_for_status()
+    return resp.json()
+
+
+async def get_object(path: str) -> tuple[bytes, str]:
+    key = await init_storage()
+    async with httpx.AsyncClient(timeout=60) as client:
+        resp = await client.get(f"{STORAGE_URL}/objects/{path}", headers={"X-Storage-Key": key})
+        if resp.status_code == 404:
+            key = await init_storage(force=True)
+            resp = await client.get(f"{STORAGE_URL}/objects/{path}", headers={"X-Storage-Key": key})
+        resp.raise_for_status()
+    return resp.content, resp.headers.get("Content-Type", "application/octet-stream")
+
+
+@api_router.post("/admin/upload")
+async def upload_photo(request: Request, file: UploadFile = File(...), user: dict = Depends(get_current_user)):
+    if (file.content_type or "") not in ALLOWED_IMAGE_TYPES:
+        raise HTTPException(status_code=400, detail="Only JPG, PNG or WebP images are allowed")
+    data = await file.read()
+    if len(data) > MAX_UPLOAD_BYTES:
+        raise HTTPException(status_code=400, detail="Image is too large — keep it under 5 MB")
+    ext = ALLOWED_IMAGE_TYPES[file.content_type]
+    path = f"{STORAGE_APP}/uploads/{uuid.uuid4()}.{ext}"
+    result = await put_object(path, data, file.content_type)
+    await db.files.insert_one({
+        "id": str(uuid.uuid4()),
+        "storage_path": result.get("path", path),
+        "original_filename": file.filename or "",
+        "content_type": file.content_type,
+        "size": result.get("size", len(data)),
+        "uploaded_by": user.get("email", ""),
+        "is_deleted": False,
+        "created_at": now_iso(),
+    })
+    logger.info(f"Photo uploaded by {user.get('email')}: {result.get('path', path)} ({len(data)} bytes)")
+    # Relative URL — resolves against whichever domain the site is served from
+    return {"url": f"/api/files/{result.get('path', path)}", "path": result.get("path", path)}
+
+
+@api_router.get("/files/{file_path:path}")
+async def serve_file(file_path: str):
+    record = await db.files.find_one({"storage_path": file_path, "is_deleted": False})
+    if not record:
+        raise HTTPException(status_code=404, detail="File not found")
+    data, content_type = await get_object(file_path)
+    return Response(
+        content=data,
+        media_type=record.get("content_type") or content_type,
+        headers={"Cache-Control": "public, max-age=86400"},
+    )
 
 
 # ---------------- Public endpoints ----------------
@@ -1288,6 +1378,12 @@ async def startup():
     await db.users.create_index("email", unique=True)
     await db.login_attempts.create_index("identifier")
     await db.login_events.create_index("created_at")
+
+    try:
+        await init_storage()
+        logger.info("Storage initialized")
+    except Exception as e:
+        logger.error(f"Storage init failed (uploads unavailable until fixed): {e}")
 
     unnumbered = await db.announcements.find({"notice_no": {"$exists": False}}).sort("created_at", 1).to_list(1000)
     if unnumbered:

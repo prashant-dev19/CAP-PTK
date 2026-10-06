@@ -5,6 +5,7 @@ import { NoticeModal, Pagination, padNo } from "@/components/NoticesList";
 import ApprovalsTab from "@/components/admin/ApprovalsTab";
 import UsersTab from "@/components/admin/UsersTab";
 import SecurityTab from "@/components/admin/SecurityTab";
+import PhotoUpload from "@/components/admin/PhotoUpload";
 import { api, formatApiError } from "@/lib/api";
 import { LogoMark } from "@/components/Logo";
 
@@ -447,7 +448,7 @@ function PopupEditor() {
 
       <div className="mt-8 space-y-6">
         <label className="block">
-          <span className="field-label">Title</span>
+        <span className="field-label">Title</span>
           <input
             className="field"
             data-testid="popup-title"
@@ -469,17 +470,13 @@ function PopupEditor() {
             maxLength={2000}
           />
         </label>
-        <label className="block">
-          <span className="field-label">Image URL</span>
-          <input
-            className="field"
-            data-testid="popup-image-url"
-            value={form.image_url}
-            onChange={(e) => setForm({ ...form, image_url: e.target.value })}
-            placeholder="https:// … link to a poster or image (optional)"
-            maxLength={600}
-          />
-        </label>
+        <PhotoUpload
+          value={form.image_url}
+          onChange={(v) => setForm({ ...form, image_url: v })}
+          testPrefix="popup-photo"
+          label="Pop-up image"
+          hint="JPG, PNG or WebP up to 5 MB — a poster or announcement image (optional)."
+        />
       </div>
 
       {msg && (
@@ -581,16 +578,15 @@ function SquadEditor({ squad, onSaved }) {
         </button>
       </div>
 
-      <label className="block mt-6">
-        <span className="field-label">Group photo URL</span>
-        <input
-          className="field"
-          data-testid={`squad-photo-${sid}`}
+      <div className="mt-6">
+        <PhotoUpload
           value={photo}
-          onChange={(e) => setPhoto(e.target.value)}
-          placeholder="https:// … link to the squad's group photograph"
+          onChange={setPhoto}
+          testPrefix={`squad-photo-${sid}`}
+          label="Group photo"
+          hint="JPG, PNG or WebP up to 5 MB — upload the squad's group photograph."
         />
-      </label>
+      </div>
 
       <div className="mt-8">
         <div className="flex items-center justify-between mb-4">
@@ -932,7 +928,7 @@ function Dashboard({ user, onLogout }) {
           ) : (
             <div className="space-y-10" data-testid="squads-admin-list">
               <p className="text-ivory/50 text-sm max-w-2xl leading-relaxed">
-                Keep each squad current: paste the group photograph link, add every selected player
+                Keep each squad current: upload the group photograph, add every selected player
                 with their details, and save. The public squads page updates instantly.
               </p>
               {[
