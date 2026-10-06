@@ -476,7 +476,7 @@ function PopupEditor() {
           onChange={(v) => setForm({ ...form, image_url: v })}
           testPrefix="popup-photo"
           label="Pop-up image"
-          hint="JPG, PNG or WebP up to 5 MB — a poster or announcement image (optional)."
+          hint="JPG, PNG or WebP — big photos are shrunk automatically for fast loading (optional)."
         />
       </div>
 
@@ -585,7 +585,7 @@ function SquadEditor({ squad, onSaved }) {
           onChange={setPhoto}
           testPrefix={`squad-photo-${sid}`}
           label="Group photo"
-          hint="JPG, PNG or WebP up to 5 MB — upload the squad's group photograph."
+          hint="JPG, PNG or WebP — big photos are shrunk automatically for fast loading."
         />
       </div>
 

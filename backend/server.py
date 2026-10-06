@@ -4,6 +4,7 @@ load_dotenv()
 
 import os
 import re
+import io
 import uuid
 import asyncio
 import ipaddress
@@ -12,6 +13,7 @@ import bcrypt
 import httpx
 import jwt
 import pyotp
+from PIL import Image, ImageOps
 from html import escape
 from html.parser import HTMLParser
 from urllib.parse import urlparse
@@ -457,7 +459,7 @@ STORAGE_URL = STORAGE_BASE.rstrip("/") + "/objstore/api/v1/storage"
 STORAGE_APP = "capathankot"
 STORAGE_KEY_HOLDER = {"key": None}
 ALLOWED_IMAGE_TYPES = {"image/jpeg": "jpg", "image/png": "png", "image/webp": "webp"}
-MAX_UPLOAD_BYTES = 5 * 1024 * 1024
+MAX_UPLOAD_BYTES = 12 * 1024 * 1024
 
 
 async def init_storage(force: bool = False) -> str:
@@ -502,6 +504,48 @@ async def get_object(path: str) -> tuple[bytes, str]:
     return resp.content, resp.headers.get("Content-Type", "application/octet-stream")
 
 
+# Large uploads are shrunk automatically: anything bigger than this on the long
+# edge (or heavier than MAX_STORE_BYTES) gets resized + re-encoded for fast mobile loading.
+MAX_EDGE_PX = 1920
+MAX_STORE_BYTES = 500 * 1024
+JPEG_QUALITY, WEBP_QUALITY = 85, 85
+
+
+def optimize_image(data: bytes, content_type: str):
+    """Downscale + re-encode oversized uploads; leave small ones byte-identical.
+
+    Returns (optimized_bytes, new_content_type, new_ext). Photos land well under
+    500 KB; images that already fit are passed through untouched (keeps
+    transparency and avoids quality loss on logos). Animated files are never
+    flattened.
+    """
+    try:
+        img = Image.open(io.BytesIO(data))
+        img.load()
+    except Exception:
+        raise HTTPException(status_code=400, detail="That file doesn't look like a valid image")
+
+    if getattr(img, "is_animated", False):
+        return data, content_type, ALLOWED_IMAGE_TYPES[content_type]
+
+    img = ImageOps.exif_transpose(img)  # respect phone-camera rotation
+    has_alpha = img.mode in ("RGBA", "LA") or (img.mode == "P" and "transparency" in img.info)
+
+    if img.width <= MAX_EDGE_PX and img.height <= MAX_EDGE_PX and len(data) <= MAX_STORE_BYTES:
+        return data, content_type, ALLOWED_IMAGE_TYPES[content_type]
+
+    if img.width > MAX_EDGE_PX or img.height > MAX_EDGE_PX:
+        img.thumbnail((MAX_EDGE_PX, MAX_EDGE_PX), Image.LANCZOS)
+
+    buffer = io.BytesIO()
+    if has_alpha:
+        img.save(buffer, "WEBP", quality=WEBP_QUALITY, method=6)
+        return buffer.getvalue(), "image/webp", "webp"
+    img = img.convert("RGB")
+    img.save(buffer, "JPEG", quality=JPEG_QUALITY, optimize=True)
+    return buffer.getvalue(), "image/jpeg", "jpg"
+
+
 @api_router.post("/admin/upload")
 async def upload_photo(request: Request, file: UploadFile = File(...), user: dict = Depends(get_current_user)):
     if (file.content_type or "") not in ALLOWED_IMAGE_TYPES:
@@ -509,14 +553,17 @@ async def upload_photo(request: Request, file: UploadFile = File(...), user: dic
     data = await file.read(MAX_UPLOAD_BYTES + 1)  # incremental read — a huge body can't blow up the worker
     if len(data) > MAX_UPLOAD_BYTES:
         raise HTTPException(status_code=400, detail="Image is too large — keep it under 5 MB")
-    ext = ALLOWED_IMAGE_TYPES[file.content_type]
+    original_size = len(data)
+    data, content_type, ext = optimize_image(data, file.content_type)
+    if len(data) < original_size:
+        logger.info(f"Photo optimized: {original_size // 1024} KB -> {len(data) // 1024} KB ({content_type})")
     path = f"{STORAGE_APP}/uploads/{uuid.uuid4()}.{ext}"
-    result = await put_object(path, data, file.content_type)
+    result = await put_object(path, data, content_type)
     await db.files.insert_one({
         "id": str(uuid.uuid4()),
         "storage_path": result.get("path", path),
         "original_filename": file.filename or "",
-        "content_type": file.content_type,
+        "content_type": content_type,
         "size": result.get("size", len(data)),
         "uploaded_by": user.get("email", ""),
         "is_deleted": False,
@@ -685,7 +732,6 @@ async def toggle_pin_announcement(announcement_id: str, user: dict = Depends(get
 @api_router.get("/admin/registrations/export")
 async def export_registrations_csv(admin: dict = Depends(get_current_user)):
     import csv
-    import io
 
     docs = await db.registrations.find().sort("created_at", -1).to_list(5000)
     buffer = io.StringIO()

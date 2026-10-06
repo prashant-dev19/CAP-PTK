@@ -75,14 +75,16 @@ class TestUpload:
         assert "JPG" in r.json().get("detail", "")
 
     def test_upload_rejects_oversize(self, admin_sess):
-        big = b"\x89PNG\r\n\x1a\n" + b"\x00" * (6 * 1024 * 1024)
+        """The input cap is 12 MB; anything bigger is rejected outright.
+        (Photos under the cap are accepted and auto-compressed on storage.)"""
+        big = b"\x89PNG\r\n\x1a\n" + b"\x00" * (13 * 1024 * 1024)
         r = admin_sess.post(
             f"{BASE_URL}/api/admin/upload",
             files={"file": ("big.png", big, "image/png")},
         )
         assert r.status_code == 400
         detail = r.json().get("detail", "").lower()
-        assert "5" in detail or "large" in detail
+        assert "12" in detail or "large" in detail
 
     def test_upload_png_and_fetch(self, admin_sess):
         png = make_png()
