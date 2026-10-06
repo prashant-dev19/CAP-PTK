@@ -1,0 +1,26 @@
+{
+  "summary": "Tested the new menu/pages editor feature end-to-end (backend + frontend). Backend: 7/7 pytest tests pass covering public GET /api/menu defaults, admin direct update with persistence + bare-domain auto-https prefix, 25-item cap, pages dict sanitized to {squads,notices,register}, empty-label 422 validation, editor PUT → pending change with public menu unchanged → admin approval reflects publicly, and unauthenticated 401/403. Frontend: Admin Menus tab renders with all required testids; toggling the Squads page off makes nav-link-squads and footer-link-squads disappear and /squads shows the page-unavailable screen with Back-to-home link; toggling Register CTA off hides nav-register-cta; adding a new 'Notices' item appears in both navbar and Explore footer; up-arrow reorder reflects on the live site; client-side 'Give every menu item a name before saving' validation blocks url-without-label; Reset to defaults restores the 4 original items. Editor flow: editor sees Menus tab, save shows 'Submitted — an admin must approve it before it goes live', public /api/menu unaffected until admin approves/rejects via Approvals tab. Regression: all 10 admin tabs (Registrations, Messages, Announcements, Squads, Pop-up, Homepage, Menus, Security, Approvals, Users) render; public routes /, /squads, /notices, /register return 200; footer 'Designed by Iravati Solutions' credit intact. STATE RESTORED: public /api/menu back to 4 default items, all 3 pages ON, Register CTA ON, pending editor change rejected.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_menu.py",
+    "/app/test_reports/pytest/menu_results.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "Minor: _clean_menu reassigns a fresh uuid to every item on every save, so item IDs are not stable across edits — fine today because the frontend doesn't rely on them, but if the UI ever needs stable per-item keys (e.g. per-item approval diffs or analytics), consider preserving the incoming id when valid.",
+    "Minor: PUT /api/admin/menu has no explicit role check for 'admin' or 'editor' — any authenticated user with a valid token can either save directly (admin) or queue a pending change. If there are/will be other authenticated roles (e.g. viewer), add an allow-list; today only admin/editor exist, so this is latent risk, not a bug.",
+    "Non-blocking: server.py is 1495 lines — consider splitting menu/pages, popup, homepage, and auth into separate routers for maintainability (threshold in review guidelines is 700)."
+  ],
+  "updated_files": ["/app/backend/tests/test_menu.py"],
+  "success_rate": {"backend": "100% (7/7)", "frontend": "100% (all tested flows)"},
+  "test_credentials": "admin@capathankot.in / CAPadmin#2026 ; editor@capathankot.in / Editor@123",
+  "seed_data_creation": "None added. Pending editor change created during tests was rejected; menu returned to defaults.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Menu feature is fully working. /app/backend/tests/test_menu.py uses pytest fixtures that reset menu to defaults before AND after every test and rejects any lingering menu pending changes, so it's safe to re-run. Testids reference: admin tab triggers use text (page.get_by_role('button', name='Menus')), the inner MenuTab container has data-testid='menu-tab', the Approvals tab shows the pending menu change under resource='menu' with description 'Menu & pages update'."
+}
